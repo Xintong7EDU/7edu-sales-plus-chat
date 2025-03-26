@@ -165,6 +165,14 @@ export async function generatePostOnboardingChatCompletion(
     console.log('Received messages count:', messages.length);
     console.log('Advanced mode:', options.advancedMode !== false);
     
+    // Debug log raw incoming messages
+    console.log('Raw incoming messages:');
+    messages.forEach((msg, idx) => {
+      console.log(`[${idx}] ${msg.role}: ${typeof msg.content === 'string' ? 
+        (msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content) : 
+        'Content is not a string'}`);
+    });
+    
     // Make a deep copy of the messages array to avoid modifying the original
     let processedMessages = [...messages];
     
@@ -196,7 +204,14 @@ export async function generatePostOnboardingChatCompletion(
     // Ensure there's at least one user message
     if (!processedMessages.some(msg => msg.role === 'user')) {
       console.warn('No user messages found in the conversation history');
+      throw new Error('At least one user message is required in the conversation');
     }
+    
+    // Verify integrity of the processed messages array
+    console.log('Message array structure check:');
+    console.log('- Has system message:', processedMessages.some(msg => msg.role === 'system'));
+    console.log('- Has user message:', processedMessages.some(msg => msg.role === 'user'));
+    console.log('- Last message role:', processedMessages[processedMessages.length - 1]?.role);
     
     // Log the final message array for debugging
     console.log('Final message array for OpenAI:', processedMessages.map(msg => ({
@@ -211,6 +226,17 @@ export async function generatePostOnboardingChatCompletion(
       // Return a stream response handler instead
       return "STREAMING_ENABLED";  // This is a marker that will be handled by the route.ts file
     }
+
+    // Log the complete request payload
+    console.log('OpenAI API request payload:', {
+      model: 'chatgpt-4o-latest',
+      messages_count: processedMessages.length,
+      temperature: options.temperature ?? 0.8,
+      max_tokens: options.max_tokens ?? 2000,
+      presence_penalty: options.presence_penalty ?? 0.7,
+      frequency_penalty: options.frequency_penalty ?? 0.5,
+      user_query: processedMessages.find(msg => msg.role === 'user')?.content?.toString().substring(0, 100) + '...',
+    });
 
     // Standard non-streaming mode with real API key
     const response = await openai.chat.completions.create({
@@ -262,6 +288,14 @@ export async function streamPostOnboardingChatCompletion(
     console.log('Received messages count:', messages.length);
     console.log('Advanced mode:', options.advancedMode !== false);
     
+    // Debug log raw incoming messages for streaming request
+    console.log('Raw incoming messages for streaming:');
+    messages.forEach((msg, idx) => {
+      console.log(`[${idx}] ${msg.role}: ${typeof msg.content === 'string' ? 
+        (msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content) : 
+        'Content is not a string'}`);
+    });
+    
     // Make a deep copy of the messages array to avoid modifying the original
     let processedMessages = [...messages];
     
@@ -280,6 +314,29 @@ export async function streamPostOnboardingChatCompletion(
         msg.role === 'system' ? systemMessage : msg
       );
     }
+    
+    // Verify message array integrity for streaming
+    if (!processedMessages.some(msg => msg.role === 'user')) {
+      console.error('No user messages found in streaming request');
+      throw new Error('At least one user message is required for streaming');
+    }
+    
+    console.log('Streaming message array structure check:');
+    console.log('- Has system message:', processedMessages.some(msg => msg.role === 'system'));
+    console.log('- Has user message:', processedMessages.some(msg => msg.role === 'user'));
+    console.log('- Message count:', processedMessages.length);
+    
+    // Log the streaming request payload
+    console.log('OpenAI API streaming request payload:', {
+      model: 'chatgpt-4o-latest',
+      messages_count: processedMessages.length,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.max_tokens ?? 2000,
+      presence_penalty: options.presence_penalty ?? 0.7,
+      frequency_penalty: options.frequency_penalty ?? 0.5,
+      stream: true,
+      user_query: processedMessages.find(msg => msg.role === 'user')?.content?.toString().substring(0, 100) + '...',
+    });
     
     // Create and return the streaming response
     const stream = await openai.chat.completions.create({

@@ -110,6 +110,38 @@ export async function sendStreamingChatRequest(
     console.log('Sending streaming chat request');
     console.log('Using advanced mode:', advancedMode);
     
+    // More thorough validation of message array
+    if (!messages || messages.length === 0) {
+      console.error('Message array is empty or undefined');
+      onError?.(new Error('No messages to send'));
+      return;
+    }
+    
+    // Validate that there's at least one user message
+    const hasUserMessage = messages.some(msg => msg.role === 'user');
+    if (!hasUserMessage) {
+      console.error('No user messages found in the chat history for API request');
+      onError?.(new Error('Cannot send a request without a user message. Please type a message first.'));
+      return;
+    }
+    
+    // Ensure the most recent non-system message is a user message
+    const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+    const lastNonSystemMessage = nonSystemMessages[nonSystemMessages.length - 1];
+    
+    if (!lastNonSystemMessage || lastNonSystemMessage.role !== 'user') {
+      console.error('The most recent non-system message is not from the user');
+      console.log('Messages array structure issue - fixing order not implemented');
+    }
+    
+    // Log complete message array for debugging
+    console.log('Complete message array being sent to API:');
+    messages.forEach((msg, index) => {
+      console.log(`[${index}] ${msg.role}: ${typeof msg.content === 'string' ? 
+        (msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content) : 
+        'Content is not a string'}`);
+    });
+    
     // Call the API endpoint in route.ts
     const response = await fetch('/api/post-onboarding-chat', {
       method: 'POST',

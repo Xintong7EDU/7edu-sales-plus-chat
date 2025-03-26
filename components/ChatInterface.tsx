@@ -131,11 +131,31 @@ export default function ChatInterface() {
         return;
       }
       
+      // Create a deep copy to avoid modifying original messages
+      // Get the most up-to-date messages after adding the user message
+      const updatedChat = getCurrentChat();
+      if (!updatedChat) {
+        console.error('Updated chat not found');
+        setIsLoading(false);
+        setIsThinking(false);
+        return;
+      }
+      
       // Prepare messages for the API
-      const formattedMessages = chat.messages.map(msg => ({
+      const formattedMessages = updatedChat.messages.map(msg => ({
         role: msg.role,
         content: msg.content
       }));
+      
+      // Double-check: if the user message is somehow still missing, add it explicitly
+      const lastUserMessage = formattedMessages.findLast(msg => msg.role === 'user');
+      if (!lastUserMessage || lastUserMessage.content !== message) {
+        console.log('Latest user message not found in chat history, adding it explicitly');
+        formattedMessages.push({
+          role: 'user',
+          content: message
+        });
+      }
       
       // Add debug logging
       console.log('Chat history being sent to API:', formattedMessages);

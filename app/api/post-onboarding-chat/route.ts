@@ -90,6 +90,46 @@ export async function POST(request: NextRequest) {
       content: msg.content
     }));
 
+    // Validate user message presence
+    const hasUserMessage = formattedMessages.some(msg => msg.role === 'user');
+    if (!hasUserMessage) {
+      console.error('No user message found in the request messages');
+      return NextResponse.json(
+        { error: 'At least one user message is required' },
+        { status: 400 }
+      );
+    }
+
+    // Ensure the correct ordering and presence of messages
+    const nonSystemMessages = formattedMessages.filter(msg => msg.role !== 'system');
+    const lastNonSystemMessage = nonSystemMessages[nonSystemMessages.length - 1];
+    
+    if (!lastNonSystemMessage || lastNonSystemMessage.role !== 'user') {
+      console.warn('The most recent non-system message should be from the user');
+      // This is informational only, we'll continue processing
+    }
+
+    // Log detailed request information
+    console.log('Request details to OpenAI:');
+    console.log('- Total message count:', formattedMessages.length);
+    console.log('- Advanced prompt mode:', advancedMode);
+    console.log('- User profile highlights:', {
+      grade: userProfile.grade,
+      gpa: userProfile.gpa,
+      dreamSchool: userProfile.dreamSchool || 'Not specified',
+      major: userProfile.major || 'Not specified',
+      answersCount: userProfile.answers?.length || 0
+    });
+    console.log('- Stream mode:', stream);
+
+    // Log full messages array (truncated)
+    console.log('Full messages array being sent to OpenAI:');
+    formattedMessages.forEach((msg, index) => {
+      console.log(`[${index}] ${msg.role}: ${typeof msg.content === 'string' ? 
+        (msg.content.length > 100 ? msg.content.substring(0, 100) + '...' : msg.content) : 
+        'Content is not a string'}`);
+    });
+
     try {
       // STREAMING BRANCH: Handle streaming response if requested
       if (stream) {
