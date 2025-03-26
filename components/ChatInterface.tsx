@@ -12,11 +12,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { GraduationCapIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { sendStreamingChatRequest, formatStreamingMarkdown } from '@/app/lib/utils/streamUtils';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function ChatInterface() {
   const { userProfile } = useUser();
-  const { currentChatId, createNewChat, addMessage, getCurrentChat } = useChat();
+  const { currentChatId, createNewChat, addMessage, getCurrentChat, clearSystemTyping } = useChat();
   const [isLoading, setIsLoading] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   
@@ -27,12 +33,12 @@ export default function ChatInterface() {
     }
   }, [currentChatId, createNewChat]);
 
-  // Auto scroll to bottom when messages change
+  // Auto scroll to bottom when messages change or streaming text updates
   useEffect(() => {
     if (viewportRef.current) {
       viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
     }
-  }, [getCurrentChat()?.messages]);
+  }, [getCurrentChat()?.messages, streamingText, isThinking]);
 
   // Set up the viewportRef when ScrollArea is mounted
   useEffect(() => {
@@ -43,6 +49,15 @@ export default function ChatInterface() {
       }
     }
   }, [scrollAreaRef.current]);
+  
+  // Clear any system typing messages if component unmounts
+  useEffect(() => {
+    return () => {
+      if (currentChatId) {
+        clearSystemTyping(currentChatId);
+      }
+    };
+  }, [currentChatId, clearSystemTyping]);
 
   const handleSendMessage = async (message: string) => {
     if (!currentChatId) return;
@@ -50,8 +65,25 @@ export default function ChatInterface() {
     // Add user message
     addMessage(currentChatId, message, 'user');
     
-    // Set loading state
+    // Clear any previous system typing messages
+    if (currentChatId) {
+      clearSystemTyping(currentChatId);
+    }
+    
+    // Reset streaming state
+    setStreamingText('');
+    setIsStreaming(false);
+    
+    // Only briefly show thinking state for a more immediate response
+    setIsThinking(true);
     setIsLoading(true);
+    
+    // Immediately scroll to the bottom to show the thinking indicator
+    setTimeout(() => {
+      if (viewportRef.current) {
+        viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+      }
+    }, 0);
     
     try {
       // Get current chat for message history
@@ -60,16 +92,33 @@ export default function ChatInterface() {
       if (!chat) {
         console.error('Chat not found');
         setIsLoading(false);
+        setIsThinking(false);
         return;
       }
       
       // If no user profile, provide a generic response without API call
       if (!userProfile) {
-        setTimeout(() => {
-          const response = generateGenericResponse(message);
-          addMessage(currentChatId, response, 'system');
-          setIsLoading(false);
-        }, 1000);
+        // Skip the thinking delay entirely
+        setIsThinking(false);
+        
+        // Simulate streaming for generic responses too
+        setIsStreaming(true);
+        const response = generateGenericResponse(message);
+        
+        // Stream the generic response character by character
+        for (let i = 0; i < response.length; i++) {
+          await new Promise(resolve => setTimeout(resolve, Math.random() * 15 + 5)); // Faster typing
+          setStreamingText(response.substring(0, i + 1));
+        }
+        
+        // After streaming complete, add the message to chat history
+        // First add the message
+        addMessage(currentChatId, response, 'system');
+        
+        // Immediately hide streaming UI since the message has been added
+        // No need for delay since the styles now match exactly
+        setIsStreaming(false);
+        setIsLoading(false);
         return;
       }
       
@@ -82,39 +131,57 @@ export default function ChatInterface() {
       // Add debug logging
       console.log('Chat history being sent to API:', formattedMessages);
       
-      // Choose the appropriate API endpoint
-      const apiEndpoint = '/api/post-onboarding-chat' 
+      // Skip the thinking delay entirely
+      setIsThinking(false);
+      setIsStreaming(true);
       
-      // Make API call to the appropriate OpenAI endpoint
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Use the streaming utility
+      await sendStreamingChatRequest(
+        formattedMessages,
+        userProfile,
+        (chunk) => {
+          // On the first chunk, immediately hide thinking and show streaming
+          if (isThinking) {
+            setIsThinking(false);
+          }
+          
+          // Update streaming text with each chunk
+          setStreamingText(prev => prev + chunk);
         },
-        body: JSON.stringify({
-          messages: formattedMessages,
-          userProfile
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get response from AI');
-      }
-      
-      const data = await response.json();
-      
-      // Add AI response to chat
-      addMessage(currentChatId, data.message, 'system');
+        (fullText) => {
+          // When streaming is complete, add the full message to chat
+          // First add the message to the chat
+          addMessage(currentChatId, fullText, 'system');
+          
+          // Immediately hide streaming UI since the message has been added
+          // No need for delay since the styles now match exactly
+          setIsStreaming(false);
+          setIsLoading(false);
+        },
+        (error) => {
+          console.error('Streaming error:', error);
+          setIsStreaming(false);
+          setIsLoading(false);
+          addMessage(
+            currentChatId,
+            'Sorry, I encountered an error while processing your request. Please try again.',
+            'system'
+          );
+        }
+      );
     } catch (error) {
       console.error('Error generating response:', error);
+      setIsThinking(false);
+      setIsStreaming(false);
       addMessage(
         currentChatId,
         'Sorry, I encountered an error while processing your request. Please try again.',
         'system'
       );
     } finally {
-      setIsLoading(false);
+      if (isLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -172,7 +239,7 @@ export default function ChatInterface() {
             </AlertDescription>
           </Alert>
         )}
-        {userProfile && (
+        {/* {userProfile && (
           <Alert 
             className={cn(
               "mt-2",
@@ -198,13 +265,13 @@ export default function ChatInterface() {
               )}
             </AlertDescription>
           </Alert>
-        )}
+        )} */}
       </div>
       
       <div className="flex-1 bg-white overflow-hidden">
         <ScrollArea ref={scrollAreaRef} className="h-full" type="always">
           <div className="p-6 space-y-6">
-            {currentChat.messages.length === 0 && (
+            {currentChat.messages.length === 0 && !isThinking && !isStreaming && (
               <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <GraduationCapIcon className="w-8 h-8 text-green-600" />
@@ -214,20 +281,50 @@ export default function ChatInterface() {
               </div>
             )}
             
+            {/* Existing chat messages */}
             {currentChat.messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
             
-            {isLoading && (
+            {/* Thinking indicator (minimal) */}
+            {isThinking && (
               <div className="flex w-full justify-start">
-                <div className="bg-gray-50 border border-gray-100 px-4 py-3 rounded-lg max-w-[80%]">
-                  <div className="flex space-x-2 items-center">
-                    <div className="animate-pulse flex space-x-2">
-                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
-                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
-                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
+                <Avatar className="h-8 w-8 mr-3 mt-1 flex-shrink-0">
+                  <AvatarImage src="/avatars/counselor.png" alt="7Edu Counselor" />
+                  <AvatarFallback className="bg-green-100 text-green-700">
+                    <GraduationCapIcon className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="max-w-[85%] rounded-xl bg-gray-50 text-gray-800 border border-gray-100">
+                  <div className="px-4 py-3 text-sm flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <div className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                      <div className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '250ms' }}></div>
+                      <div className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '500ms' }}></div>
                     </div>
-                    <span className="text-xs text-gray-500">Counselor is thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Streaming text display */}
+            {isStreaming && streamingText && (
+              <div className="flex w-full justify-start">
+                <Avatar className="h-8 w-8 mr-3 mt-1 flex-shrink-0">
+                  <AvatarImage src="/avatars/counselor.png" alt="7Edu Counselor" />
+                  <AvatarFallback className="bg-green-100 text-green-700">
+                    <GraduationCapIcon className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="max-w-[85%] rounded-xl bg-gray-50 text-gray-800 border border-gray-100">
+                  <div className="px-4 py-3 text-sm">
+                    <div className="cursor-container">
+                      <div dangerouslySetInnerHTML={{ __html: formatStreamingMarkdown(streamingText) }} />
+                      <span className="cursor"></span>
+                    </div>
+                  </div>
+                  <div className="text-xs px-4 pb-2 text-gray-500">
+                    {formatDistanceToNow(new Date(), { addSuffix: true })}
                   </div>
                 </div>
               </div>
@@ -237,8 +334,45 @@ export default function ChatInterface() {
       </div>
       
       <div className="flex-shrink-0">
-        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || isThinking || isStreaming} />
       </div>
+
+      {/* Add CSS for custom animations */}
+      <style jsx global>{`
+        @keyframes blink {
+          0%, 100% { opacity: 0; }
+          50% { opacity: 1; }
+        }
+        
+        .animate-blink {
+          animation: blink 0.8s ease-in-out infinite;
+        }
+        
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-in-out;
+        }
+        
+        .cursor-container {
+          position: relative;
+          display: inline;
+        }
+        
+        .cursor {
+          display: inline-block;
+          width: 2px;
+          height: 1.2em;
+          background-color: #16a34a;
+          margin-left: 1px;
+          position: relative;
+          animation: blink 0.8s ease-in-out infinite;
+          vertical-align: text-bottom;
+        }
+      `}</style>
     </div>
   );
 } 

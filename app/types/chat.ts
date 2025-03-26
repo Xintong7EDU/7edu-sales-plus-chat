@@ -3,6 +3,7 @@ export interface Message {
   content: string;
   role: 'user' | 'system';
   timestamp: number;
+  isTyping?: boolean; // Flag to indicate if this is a system message being typed
 }
 
 export interface Chat {

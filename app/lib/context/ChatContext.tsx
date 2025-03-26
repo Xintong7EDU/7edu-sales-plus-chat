@@ -14,6 +14,7 @@ interface ChatContextType {
   addMessage: (chatId: string, content: string, role: 'user' | 'system') => void;
   getChatList: () => Chat[];
   getCurrentChat: () => Chat | null;
+  clearSystemTyping: (chatId: string) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -147,6 +148,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     return currentChatId ? chats[currentChatId] : null;
   };
 
+  const clearSystemTyping = (chatId: string) => {
+    setChats((prevChats) => {
+      // If the chat doesn't exist, do nothing
+      if (!prevChats[chatId]) {
+        return prevChats;
+      }
+
+      // Get the chat's messages
+      const chatMessages = [...prevChats[chatId].messages];
+      
+      // Remove any system message with the "typing" flag
+      const filteredMessages = chatMessages.filter(
+        (msg) => !(msg.role === 'system' && msg.isTyping)
+      );
+
+      // If no messages were removed, just return the original chats object
+      if (filteredMessages.length === chatMessages.length) {
+        return prevChats;
+      }
+
+      // Otherwise, update the chat with the filtered messages
+      const updatedChat = {
+        ...prevChats[chatId],
+        messages: filteredMessages,
+      };
+
+      return {
+        ...prevChats,
+        [chatId]: updatedChat,
+      };
+    });
+  };
+
   return (
     <ChatContext.Provider
       value={{
@@ -158,6 +192,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         addMessage,
         getChatList,
         getCurrentChat,
+        clearSystemTyping,
       }}
     >
       {children}

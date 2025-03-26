@@ -14,6 +14,7 @@ interface ChatOptions {
   max_tokens?: number;
   presence_penalty?: number;
   frequency_penalty?: number;
+  stream?: boolean;
 }
 
 /**
@@ -160,7 +161,13 @@ export async function generatePostOnboardingChatCompletion(
         : 'Content is not a string'
     })));
 
-    // Production mode with real API key
+    // Check if streaming is requested
+    if (options.stream) {
+      // Return a stream response handler instead
+      return "STREAMING_ENABLED";  // This is a marker that will be handled by the route.ts file
+    }
+
+    // Standard non-streaming mode with real API key
     const response = await openai.chat.completions.create({
       model: 'chatgpt-4o-latest',
       messages: processedMessages,
@@ -181,5 +188,56 @@ export async function generatePostOnboardingChatCompletion(
   } catch (error) {
     console.error('Error generating post-onboarding chat completion:', error);
     throw new Error('Failed to generate post-onboarding chat response');
+  }
+}
+
+/**
+ * Creates a streaming chat completion
+ * This function returns a stream that can be consumed by the client
+ */
+export async function streamPostOnboardingChatCompletion(
+  messages: ChatCompletionMessageParam[],
+  userProfile: UserProfile,
+  options: ChatOptions = {}
+) {
+  try {
+    console.log('Streaming post-onboarding chat completion');
+    console.log('Received messages count:', messages.length);
+    
+    // Make a deep copy of the messages array to avoid modifying the original
+    let processedMessages = [...messages];
+    
+    // Check for an existing system message
+    const hasSystemMessage = processedMessages.some(msg => msg.role === 'system');
+    
+    // If no system message exists, add it as the first message
+    if (!hasSystemMessage) {
+      console.log('Adding system message for streaming');
+      const systemMessage = createSystemMessage(userProfile);
+      processedMessages = [systemMessage, ...processedMessages];
+    } else {
+      // Replace with our system message to ensure proper context
+      const systemMessage = createSystemMessage(userProfile);
+      processedMessages = processedMessages.map(msg => 
+        msg.role === 'system' ? systemMessage : msg
+      );
+    }
+    
+    // Create and return the streaming response
+    const stream = await openai.chat.completions.create({
+      model: 'chatgpt-4o-latest',
+      messages: processedMessages,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.max_tokens ?? 2000,
+      presence_penalty: options.presence_penalty ?? 0.7,
+      frequency_penalty: options.frequency_penalty ?? 0.5,
+      stream: true,
+    });
+    
+    console.log('Stream created successfully');
+    return stream;
+  } catch (error) {
+    console.error('Error creating streaming chat completion:', error);
+    throw new Error('Failed to create streaming chat response');
   }
 } 
