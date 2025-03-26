@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Chat, Chats, Message } from '../../types/chat';
 import { useUser } from './UserContext';
+import { UserProfile } from '../../types/onboarding';
 
 interface ChatContextType {
   chats: Chats;
@@ -17,10 +18,26 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-// Function to generate welcome message based on user profile
-const generateWelcomeMessage = (studentName?: string): string => {
-  const greeting = studentName ? `Hello ${studentName}!` : 'Hello!';
-  return `${greeting} I'm your 7Edu college counselor. I'm here to help you with your college application journey. Feel free to ask me any questions about college admissions, application strategies, or specific colleges you're interested in.`;
+// Function to generate welcome message based on user profile and onboarding status
+const generateWelcomeMessage = (userProfile?: UserProfile | null): string => {
+  // No profile at all
+  if (!userProfile) {
+    return 'Hello! I\'m your 7Edu college counselor. I\'m here to help with your college application journey. To provide personalized guidance, please complete your profile through the onboarding process. In the meantime, I can answer general questions about college admissions.';
+  }
+  
+  // Check if onboarding is complete
+  const isOnboardingComplete = userProfile.questionsLeft === 0 || 
+                             (userProfile.answers && userProfile.answers.length >= 8);
+  
+  // Profile exists but onboarding not complete
+  if (!isOnboardingComplete) {
+    const remainingQuestions = userProfile.questionsLeft || 8 - (userProfile.answers?.length || 0);
+    
+    return `Hello ${userProfile.name || 'there'}! I'm your 7Edu college counselor. Your profile is partially complete with basic academic information. To receive fully personalized college guidance, please complete the remaining ${remainingQuestions} onboarding questions. In the meantime, I can provide general guidance based on your current information.`;
+  }
+  
+  // Onboarding complete - full personalized experience
+  return `Welcome back, ${userProfile.name || 'there'}! I'm your 7Edu college counselor. I have your complete profile and can provide fully personalized guidance for your college journey. Feel free to ask me about college recommendations, application strategies, essay topics, or any other college-related questions specific to your academic background and interests.`;
 };
 
 export function ChatProvider({ children }: { children: ReactNode }) {
@@ -57,7 +74,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       messages: [
         {
           id: Math.random().toString(36).substring(2, 9),
-          content: generateWelcomeMessage(userProfile?.name),
+          content: generateWelcomeMessage(userProfile),
           role: 'system',
           timestamp: Date.now(),
         },

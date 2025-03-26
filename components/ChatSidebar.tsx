@@ -17,9 +17,7 @@ export default function ChatSidebar() {
 
   const handleDeleteChat = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this conversation?')) {
-      deleteChat(id);
-    }
+    deleteChat(id);
   };
 
   return (

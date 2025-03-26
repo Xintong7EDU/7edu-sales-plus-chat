@@ -31,26 +31,69 @@ export default function ChatInterface() {
     // Add user message
     addMessage(currentChatId, message, 'user');
     
-    // Simulate AI response
+    // Set loading state
     setIsLoading(true);
     
     try {
-      // In a real app, this would be an API call to an AI service
-      // We'll simulate it with a timeout
-      setTimeout(() => {
-        let response;
-
-        // If no user profile, provide a generic response
-        if (!userProfile) {
-          response = generateGenericResponse(message);
-        } else {
-          // Generate personalized response based on user profile
-          response = generateCounselorResponse(message, userProfile);
-        }
-        
-        addMessage(currentChatId, response, 'system');
+      // Get current chat for message history
+      const chat = getCurrentChat();
+      
+      if (!chat) {
+        console.error('Chat not found');
         setIsLoading(false);
-      }, 1000);
+        return;
+      }
+      
+      // If no user profile, provide a generic response without API call
+      if (!userProfile) {
+        setTimeout(() => {
+          const response = generateGenericResponse(message);
+          addMessage(currentChatId, response, 'system');
+          setIsLoading(false);
+        }, 1000);
+        return;
+      }
+      
+      // Prepare messages for the API
+      const formattedMessages = chat.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
+      // Add debug logging
+      console.log('Chat history being sent to API:', formattedMessages);
+      
+      // Check if user has completed onboarding
+      const isOnboardingComplete = userProfile.questionsLeft === 0 || 
+                                 (userProfile.answers && userProfile.answers.length >= 8);
+      
+      // Choose the appropriate API endpoint based on onboarding status
+      const apiEndpoint = isOnboardingComplete ? '/api/post-onboarding-chat' : '/api/chat';
+      
+      console.log(`Sending chat request to ${apiEndpoint} with user profile:`, 
+                  isOnboardingComplete ? 'Onboarding complete' : 'Onboarding incomplete');
+      
+      // Make API call to the appropriate OpenAI endpoint
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: formattedMessages,
+          userProfile
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get response from AI');
+      }
+      
+      const data = await response.json();
+      
+      // Add AI response to chat
+      addMessage(currentChatId, data.message, 'system');
     } catch (error) {
       console.error('Error generating response:', error);
       addMessage(
@@ -58,6 +101,7 @@ export default function ChatInterface() {
         'Sorry, I encountered an error while processing your request. Please try again.',
         'system'
       );
+    } finally {
       setIsLoading(false);
     }
   };
@@ -136,6 +180,30 @@ export default function ChatInterface() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
             Limited functionality. <Link href="/onboarding/form" className="text-blue-500 hover:underline ml-1">Complete your profile</Link> for personalized advice.
+          </div>
+        )}
+        {userProfile && (
+          <div className={`mt-1 text-xs flex items-center ${
+            userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8)
+              ? 'text-green-600'
+              : 'text-blue-600'
+          }`}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
+              {userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8) ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9.344-2.198c-.376.023-.75.05-1.124.08C19.713 14.291 16.692 18 12 18c-4.61 0-7.629-3.621-8.022-7.292-.124-1.209-.588-2.293-.249-3.622.194-.759.437-1.439.875-1.716.577-.369.9.197.973.523.13.574 1.359 2.115 1.423 2.712.173 1.626.572 2.447.766 2.285.292-.243.176-1.426.207-1.926.033-.501.155-.961.694-.961h3.466c.539 0 .661.46.694.961.031.5-.085 1.683.207 1.926.194.162.593-.659.766-2.285.064-.597 1.293-2.138 1.423-2.712.073-.326.396-.892.973-.523.438.277.681.957.875 1.716.339 1.329-.125 2.413-.249 3.622-.393 3.67-3.413 7.292-8.022 7.292-4.692 0-7.713-3.709-8.22-7.368C2.806 10.703 2.432 10.676 2.056 10.652c-.378-.024-.74-.06-1.056-.102C4.186 2.563 11.61.59 16.064 2.771c4.455 2.18 5.3 9.03 4.936 7.881z" />
+              )}
+            </svg>
+            {userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8)
+              ? 'Advanced counseling mode - Full profile analysis available'
+              : `Basic counseling mode - Onboarding ${8 - (userProfile.questionsLeft || 0)}/${8} complete`
+            }
+            {userProfile.questionsLeft > 0 && (
+              <Link href="/onboarding/chat" className="text-blue-500 hover:underline ml-1">
+                Complete onboarding
+              </Link>
+            )}
           </div>
         )}
       </div>

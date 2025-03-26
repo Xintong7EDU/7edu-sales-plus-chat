@@ -3,6 +3,7 @@ import { Inter, Lexend } from "next/font/google";
 import "./globals.css";
 import { UserProvider } from "./lib/context/UserContext";
 import { ChatProvider } from "./lib/context/ChatContext";
+import TestModeProvider from "@/components/test/TestModeProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,6 +37,7 @@ export default function RootLayout({
           <UserProvider>
             <ChatProvider>
               {children}
+              <TestModeProvider />
             </ChatProvider>
           </UserProvider>
         </div>
