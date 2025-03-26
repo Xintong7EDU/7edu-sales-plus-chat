@@ -4,7 +4,7 @@ import { Message } from '../app/types/chat';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GraduationCap } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/app/lib/utils/utils";
 import { processMarkdownForDisplay } from '@/app/lib/utils/markdown';
 import { useEffect, useState } from 'react';
 

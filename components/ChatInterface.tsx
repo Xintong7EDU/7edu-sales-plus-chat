@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { GraduationCapIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/app/lib/utils/utils';
 import { sendStreamingChatRequest, formatStreamingMarkdown } from '@/app/lib/utils/streamUtils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';

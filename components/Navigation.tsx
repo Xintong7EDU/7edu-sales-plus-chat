@@ -6,11 +6,22 @@ import { useUser } from '../app/lib/context/UserContext';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { UserIcon, MessageCircleIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/app/lib/utils/utils';
+import { useEffect, useState } from 'react';
 
 export default function Navigation() {
   const pathname = usePathname();
   const { userProfile } = useUser();
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    // Allow a short delay for loading from localStorage
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   const navItems = [
     {
@@ -49,6 +60,9 @@ export default function Navigation() {
                   >
                     <span className="mr-2">{item.icon}</span>
                     {item.name}
+                    {item.name === 'Profile' && isLoading && (
+                      <span className="ml-2 inline-block h-3 w-3 rounded-full border-2 border-green-500 border-r-transparent animate-spin"></span>
+                    )}
                   </Link>
                 );
               })}
@@ -77,6 +91,9 @@ export default function Navigation() {
                 <span className="inline-flex items-center">
                   <span className="mr-2">{item.icon}</span>
                   {item.name}
+                  {item.name === 'Profile' && isLoading && (
+                    <span className="ml-2 inline-block h-3 w-3 rounded-full border-2 border-green-500 border-r-transparent animate-spin"></span>
+                  )}
                 </span>
               </Link>
             );

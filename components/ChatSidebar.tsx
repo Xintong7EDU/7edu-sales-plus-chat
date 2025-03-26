@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/app/lib/utils/utils';
 
 export default function ChatSidebar() {
   const { currentChatId, setCurrentChatId, getChatList, createNewChat, deleteChat } = useChat();
