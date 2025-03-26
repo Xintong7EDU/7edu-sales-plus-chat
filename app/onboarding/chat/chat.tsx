@@ -8,7 +8,7 @@ import Header from '@/components/features/Header';
 import OnboardingProgressBar from '@/components/onboarding/OnboardingProgressBar';
 import { UserProfile } from '../../types/onboarding';
 
-// Add custom scrollbar styles
+// Add custom scrollbar and animation styles
 const scrollbarStyles = `
   .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
@@ -26,6 +26,40 @@ const scrollbarStyles = `
   
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.5);
+  }
+  
+  @keyframes blink {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+  }
+  
+  .animate-blink {
+    animation: blink 0.8s ease-in-out infinite;
+  }
+  
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-in-out;
+  }
+  
+  .cursor-container {
+    position: relative;
+    display: inline;
+  }
+  
+  .cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.2em;
+    background-color: #16a34a;
+    margin-left: 1px;
+    position: relative;
+    animation: blink 0.8s ease-in-out infinite;
+    vertical-align: text-bottom;
   }
 `;
 
@@ -553,10 +587,9 @@ Does ${userProfile.name || 'your child'} participate in any sports activities, e
                         </div>
                         <div className="max-w-[85%] rounded-xl p-4 bg-white shadow-sm border border-green-100">
                           <div className="text-xs text-gray-500 mb-1">7Edu Counselor</div>
-                          <div className="flex space-x-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500 animate-bounce"></div>
-                            <div className="w-2 h-2 rounded-full bg-green-500 animate-bounce delay-100"></div>
-                            <div className="w-2 h-2 rounded-full bg-green-500 animate-bounce delay-200"></div>
+                          <div className="cursor-container">
+                            <div className="text-sm">Thinking</div>
+                            <span className="cursor"></span>
                           </div>
                         </div>
                       </div>
