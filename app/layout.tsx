@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Lexend } from "next/font/google";
 import "./globals.css";
 import { UserProvider } from "./lib/context/UserContext";
+import { ChatProvider } from "./lib/context/ChatContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,7 +34,9 @@ export default function RootLayout({
       >
         <div className="flex flex-col min-h-full">
           <UserProvider>
-            {children}
+            <ChatProvider>
+              {children}
+            </ChatProvider>
           </UserProvider>
         </div>
       </body>

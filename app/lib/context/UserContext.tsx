@@ -19,7 +19,7 @@
 
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { OnboardingFormData, UserProfile } from '../../types/onboarding';
 
 // Define the total number of questions in one place
@@ -36,6 +36,30 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  // Load user profile from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedProfile = localStorage.getItem('userProfile');
+      if (savedProfile) {
+        try {
+          const parsedProfile = JSON.parse(savedProfile);
+          console.log('Loaded user profile from localStorage:', parsedProfile);
+          setUserProfile(parsedProfile);
+        } catch (e) {
+          console.error('Failed to parse user profile from localStorage:', e);
+        }
+      }
+    }
+  }, []);
+
+  // Save user profile to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && userProfile) {
+      console.log('Saving user profile to localStorage:', userProfile);
+      localStorage.setItem('userProfile', JSON.stringify(userProfile));
+    }
+  }, [userProfile]);
 
   const updateUserProfile = (data: Partial<UserProfile>) => {
     if (userProfile) {
