@@ -4,219 +4,321 @@ import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { UserProfile } from '@/app/types/onboarding';
 import { processMarkdownForDisplay } from '@/app/lib/utils/markdown';
 
+// Types for request data
+type RequestBody = {
+  messages: any[];
+  userProfile: UserProfile;
+  stream?: boolean;
+  advancedMode?: boolean;
+};
+
+// OpenAI configuration options
+type OpenAIOptions = {
+  temperature: number;
+  max_tokens: number;
+  presence_penalty: number;
+  frequency_penalty: number;
+  stream?: boolean;
+  advancedMode: boolean;
+};
+
 /**
  * API route for post-onboarding chat interactions
  * 
- * This endpoint serves as the bridge between the client and the OpenAI service.
- * It receives chat messages from the client, validates the request, and then
- * forwards the request to the appropriate service function based on whether
- * streaming is requested.
- * 
- * Key responsibilities:
- * 1. Validate incoming request data (messages, user profile)
- * 2. Verify onboarding completion status
- * 3. Route requests to either streaming or non-streaming handlers
- * 4. Return properly formatted responses to the client
- * 
- * Relationships:
- * - Uses postOnboardingChatService.ts for actual OpenAI interactions
- * - Returns data that will be processed by streamUtils.ts on the client
- * - Formats responses using markdown utilities for non-streaming responses
+ * This endpoint handles chat interactions after user onboarding is complete.
+ * It validates requests, processes messages, and returns responses from OpenAI,
+ * supporting both streaming and non-streaming modes.
  */
 export async function POST(request: NextRequest) {
   try {
     console.log('Post-onboarding chat API called');
+    
+    // Parse and validate request
     const body = await request.json();
-    const { messages, userProfile, stream = false, advancedMode = true } = body;
+    const validationResult = validateRequest(body);
     
-    // Validate request body
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      console.error('Invalid messages format:', messages);
-      return NextResponse.json(
-        { error: 'Invalid messages format' },
-        { status: 400 }
-      );
-    }
-
-    if (!userProfile) {
-      console.error('Missing userProfile in request');
-      return NextResponse.json(
-        { error: 'User profile is required' },
-        { status: 400 }
-      );
-    }
-
-    // Validate user profile required fields and onboarding completion status
-    const requiredFields = ['grade', 'gpa'];
-    const missingFields = requiredFields.filter(field => !userProfile[field]);
-    
-    if (missingFields.length > 0) {
-      console.error(`Missing required fields: ${missingFields.join(', ')}`);
-      return NextResponse.json(
-        { error: `Missing required fields: ${missingFields.join(', ')}` },
-        { status: 400 }
-      );
+    if (validationResult.error) {
+      return validationResult.response;
     }
     
-    // Check if onboarding is complete (all questions answered)
-    const isOnboardingComplete = userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8);
+    const { messages, userProfile, stream = false, advancedMode = true } = body as RequestBody;
     
-    if (!isOnboardingComplete) {
-      console.error('Onboarding is not complete');
-      return NextResponse.json(
-        { error: 'Onboarding must be completed before using this chat endpoint' },
-        { status: 400 }
-      );
-    }
-
-    console.log('Processing post-onboarding chat request for:', userProfile.name);
-    console.log('Number of messages in conversation:', messages.length);
-    console.log('Stream mode:', stream ? 'enabled' : 'disabled');
-    console.log('Advanced mode:', advancedMode ? 'enabled' : 'disabled');
+    // Log request details
+    logRequestDetails(messages, userProfile, stream, advancedMode);
     
-    // Log the first few messages to understand conversation flow
-    if (messages.length > 0) {
-      console.log('First message role:', messages[0].role);
-      console.log('Last message role:', messages[messages.length - 1].role);
-      console.log('Last message content:', 
-        typeof messages[messages.length - 1].content === 'string' 
-          ? messages[messages.length - 1].content.substring(0, 100) + '...'
-          : 'Content is not a string');
-    }
-
-    // Format messages for OpenAI
-    const formattedMessages: ChatCompletionMessageParam[] = messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
-
-    // Validate user message presence
-    const hasUserMessage = formattedMessages.some(msg => msg.role === 'user');
-    if (!hasUserMessage) {
-      console.error('No user message found in the request messages');
-      return NextResponse.json(
-        { error: 'At least one user message is required' },
-        { status: 400 }
-      );
-    }
-
-    // Ensure the correct ordering and presence of messages
-    const nonSystemMessages = formattedMessages.filter(msg => msg.role !== 'system');
-    const lastNonSystemMessage = nonSystemMessages[nonSystemMessages.length - 1];
+    // Format and validate messages
+    const formattedMessages = formatMessages(messages);
+    const messageValidation = validateMessages(formattedMessages);
     
-    if (!lastNonSystemMessage || lastNonSystemMessage.role !== 'user') {
-      console.warn('The most recent non-system message should be from the user');
-      // This is informational only, we'll continue processing
+    if (messageValidation.error) {
+      return messageValidation.response;
     }
-
-    // Log detailed request information
-    console.log('Request details to OpenAI:');
-    console.log('- Total message count:', formattedMessages.length);
-    console.log('- Advanced prompt mode:', advancedMode);
-    console.log('- User profile highlights:', {
-      grade: userProfile.grade,
-      gpa: userProfile.gpa,
-      dreamSchool: userProfile.dreamSchool || 'Not specified',
-      major: userProfile.major || 'Not specified',
-      answersCount: userProfile.answers?.length || 0
-    });
-    console.log('- Stream mode:', stream);
-
-    // Log full messages array (truncated)
-    console.log('Full messages array being sent to OpenAI:');
-    formattedMessages.forEach((msg, index) => {
-      console.log(`[${index}] ${msg.role}: ${typeof msg.content === 'string' ? 
-        (msg.content.length > 100 ? msg.content.substring(0, 100) + '...' : msg.content) : 
-        'Content is not a string'}`);
-    });
-
-    try {
-      // STREAMING BRANCH: Handle streaming response if requested
-      if (stream) {
-        // Create stream from OpenAI using the service
-        const openaiStream = await streamPostOnboardingChatCompletion(
-          formattedMessages,
-          userProfile as UserProfile,
-          {
-            temperature: 0.7,
-            max_tokens: 2000,
-            presence_penalty: 0.7,
-            frequency_penalty: 0.5,
-            stream: true,
-            advancedMode,
-          }
-        );
-
-        // Return a streaming response to the client
-        console.log('Returning streaming response');
-        
-        // Create a readable stream to process the OpenAI stream
-        // This is what the client's streamUtils.processStreamingResponse will consume
-        const readableStream = new ReadableStream({
-          async start(controller) {
-            // Process each chunk from OpenAI stream
-            for await (const chunk of openaiStream) {
-              // Get the content delta
-              const content = chunk.choices[0]?.delta?.content || '';
-              
-              if (content) {
-                // Send raw content chunks to the client
-                // Client-side streamUtils will handle formatting
-                controller.enqueue(new TextEncoder().encode(content));
-              }
-            }
-            controller.close();
-          },
-        });
-
-        // Return the streaming response
-        return new Response(readableStream, {
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-          },
-        });
-      } 
-      // NON-STREAMING BRANCH: Standard response processing
-      else {
-        // Generate standard response using the post-onboarding chat service
-        const responseText = await generatePostOnboardingChatCompletion(
-          formattedMessages,
-          userProfile as UserProfile,
-          {
-            temperature: 0.8, // Slightly higher temperature for more varied responses
-            max_tokens: 2000, // More tokens for detailed responses
-            presence_penalty: 0.7,
-            frequency_penalty: 0.5,
-            advancedMode,
-          }
-        );
-
-        console.log('Successfully generated standard response');
-        
-        // Process markdown to HTML for better display
-        // For non-streaming, we format the markdown on the server
-        const formattedResponse = processMarkdownForDisplay(responseText);
-        
-        // Return the response
-        return NextResponse.json({ 
-          message: responseText,
-          formattedMessage: formattedResponse
-        });
-      }
-    } catch (error) {
-      console.error('Error in post-onboarding chat completion:', error);
-      return NextResponse.json(
-        { error: 'Failed to generate response. Please try again.' },
-        { status: 500 }
-      );
-    }
+    
+    // Generate OpenAI configuration based on request mode
+    const openAIOptions = getOpenAIOptions(stream, advancedMode);
+    
+    // Process request (streaming or standard)
+    return stream 
+      ? handleStreamingResponse(formattedMessages, userProfile, openAIOptions)
+      : handleStandardResponse(formattedMessages, userProfile, openAIOptions);
+      
   } catch (error) {
     console.error('Error processing post-onboarding chat request:', error);
     return NextResponse.json(
       { error: 'Invalid request format' },
       { status: 400 }
     );
+  }
+}
+
+/**
+ * Validates the incoming request data
+ */
+function validateRequest(body: any): { error: boolean; response?: NextResponse } {
+  const { messages, userProfile } = body;
+  
+  // Validate messages
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    console.error('Invalid messages format:', messages);
+    return {
+      error: true,
+      response: NextResponse.json(
+        { error: 'Invalid messages format' },
+        { status: 400 }
+      )
+    };
+  }
+
+  // Validate user profile existence
+  if (!userProfile) {
+    console.error('Missing userProfile in request');
+    return {
+      error: true,
+      response: NextResponse.json(
+        { error: 'User profile is required' },
+        { status: 400 }
+      )
+    };
+  }
+
+  // Validate required profile fields
+  const requiredFields = ['grade', 'gpa'];
+  const missingFields = requiredFields.filter(field => !userProfile[field]);
+  
+  if (missingFields.length > 0) {
+    console.error(`Missing required fields: ${missingFields.join(', ')}`);
+    return {
+      error: true,
+      response: NextResponse.json(
+        { error: `Missing required fields: ${missingFields.join(', ')}` },
+        { status: 400 }
+      )
+    };
+  }
+  
+  // Validate onboarding completion
+  const isOnboardingComplete = userProfile.questionsLeft === 0 || 
+    (userProfile.answers && userProfile.answers.length >= 8);
+  
+  if (!isOnboardingComplete) {
+    console.error('Onboarding is not complete');
+    return {
+      error: true,
+      response: NextResponse.json(
+        { error: 'Onboarding must be completed before using this chat endpoint' },
+        { status: 400 }
+      )
+    };
+  }
+  
+  return { error: false };
+}
+
+/**
+ * Formats messages for OpenAI API
+ */
+function formatMessages(messages: any[]): ChatCompletionMessageParam[] {
+  return messages.map(msg => ({
+    role: msg.role,
+    content: msg.content
+  }));
+}
+
+/**
+ * Validates the formatted messages
+ */
+function validateMessages(messages: ChatCompletionMessageParam[]): { error: boolean; response?: NextResponse } {
+  // Validate user message presence
+  const hasUserMessage = messages.some(msg => msg.role === 'user');
+  if (!hasUserMessage) {
+    console.error('No user message found in the request messages');
+    return {
+      error: true,
+      response: NextResponse.json(
+        { error: 'At least one user message is required' },
+        { status: 400 }
+      )
+    };
+  }
+
+  // Check message ordering (warning only)
+  const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+  const lastNonSystemMessage = nonSystemMessages[nonSystemMessages.length - 1];
+  
+  if (!lastNonSystemMessage || lastNonSystemMessage.role !== 'user') {
+    console.warn('The most recent non-system message should be from the user');
+    // This is informational only, we'll continue processing
+  }
+  
+  return { error: false };
+}
+
+/**
+ * Logs details about the request
+ */
+function logRequestDetails(
+  messages: any[], 
+  userProfile: UserProfile, 
+  stream: boolean, 
+  advancedMode: boolean
+): void {
+  console.log('Processing post-onboarding chat request for:', userProfile.name);
+  console.log('Number of messages in conversation:', messages.length);
+  console.log('Stream mode:', stream ? 'enabled' : 'disabled');
+  console.log('Advanced mode:', advancedMode ? 'enabled' : 'disabled');
+  
+  // Log conversation flow indicators
+  if (messages.length > 0) {
+    console.log('First message role:', messages[0].role);
+    console.log('Last message role:', messages[messages.length - 1].role);
+    console.log('Last message content:', 
+      typeof messages[messages.length - 1].content === 'string' 
+        ? messages[messages.length - 1].content.substring(0, 100) + '...'
+        : 'Content is not a string');
+  }
+  
+  // Log user profile details
+  console.log('User profile highlights:', {
+    grade: userProfile.grade,
+    gpa: userProfile.gpa,
+    dreamSchool: userProfile.dreamSchool || 'Not specified',
+    major: userProfile.major || 'Not specified',
+    answersCount: userProfile.answers?.length || 0
+  });
+  
+  // Log detailed message summaries
+  console.log('Messages summary:', messages.map((msg, index) => ({
+    index,
+    role: msg.role,
+    contentPreview: typeof msg.content === 'string'
+      ? msg.content.substring(0, 30) + (msg.content.length > 30 ? '...' : '')
+      : 'Non-string content'
+  })));
+}
+
+/**
+ * Generates configuration options for OpenAI based on request mode
+ */
+function getOpenAIOptions(stream: boolean, advancedMode: boolean): OpenAIOptions {
+  const baseOptions = {
+    max_tokens: 2000,
+    presence_penalty: 0.7,
+    frequency_penalty: 0.5,
+    advancedMode,
+  };
+  
+  return stream
+    ? {
+        ...baseOptions,
+        temperature: 0.7,
+        stream: true,
+      }
+    : {
+        ...baseOptions,
+        temperature: 0.8, // Slightly higher temperature for non-streaming responses
+      };
+}
+
+/**
+ * Handles streaming responses from OpenAI
+ */
+async function handleStreamingResponse(
+  messages: ChatCompletionMessageParam[],
+  userProfile: UserProfile,
+  options: OpenAIOptions
+): Promise<Response> {
+  try {
+    console.log('Processing streaming response request');
+    
+    const openaiStream = await streamPostOnboardingChatCompletion(
+      messages,
+      userProfile,
+      options
+    );
+    
+    console.log('OpenAI streaming connection established');
+    
+    // Create and return stream response
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of openaiStream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            
+            if (content) {
+              controller.enqueue(new TextEncoder().encode(content));
+            }
+          }
+          controller.close();
+          console.log('Streaming response completed successfully');
+        } catch (error) {
+          console.error('Error in stream processing:', error);
+          controller.error(error);
+        }
+      },
+    });
+    
+    return new Response(readableStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+  } catch (error) {
+    console.error('Failed to create streaming response:', error);
+    throw error; // Let the outer catch handle this
+  }
+}
+
+/**
+ * Handles standard (non-streaming) responses from OpenAI
+ */
+async function handleStandardResponse(
+  messages: ChatCompletionMessageParam[],
+  userProfile: UserProfile,
+  options: OpenAIOptions
+): Promise<NextResponse> {
+  try {
+    console.log('Processing standard response request');
+    
+    const responseText = await generatePostOnboardingChatCompletion(
+      messages,
+      userProfile,
+      options
+    );
+    
+    console.log('Successfully generated standard response');
+    
+    // Format markdown response for display
+    const formattedResponse = processMarkdownForDisplay(responseText);
+    
+    return NextResponse.json({ 
+      message: responseText,
+      formattedMessage: formattedResponse
+    });
+  } catch (error) {
+    console.error('Error generating standard response:', error);
+    throw error; // Let the outer catch handle this
   }
 } 
