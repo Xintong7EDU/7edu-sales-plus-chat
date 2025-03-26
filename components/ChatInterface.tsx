@@ -19,24 +19,49 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 // Components
-const EmptyChatPrompt = ({ advancedMode }: { advancedMode?: boolean }) => (
-  <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-      <GraduationCapIcon className="w-8 h-8 text-green-600" />
-    </div>
-    <h3 className="text-lg font-medium text-gray-900 mb-2">7Edu College Counselor</h3>
-    <p className="text-gray-600 max-w-md">
-      I'm here to help with your college admissions journey. Ask me anything about colleges, applications, essays, or get personalized guidance.
-    </p>
-    {advancedMode !== undefined && (
-      <div className="mt-4 text-sm text-gray-500">
-        {advancedMode ? 
-          "Using advanced mode with detailed guidance prompts" : 
-          "Using basic mode with only student profile information"}
+const EmptyChatPrompt = ({ advancedMode, onSuggestionClick }: { advancedMode?: boolean, onSuggestionClick?: (text: string) => void }) => {
+  const suggestions = [
+    "What colleges match my profile?",
+    "Help me brainstorm essay topics",
+    "How can I improve my extracurriculars?",
+    "Compare UC Berkeley and Stanford"
+  ];
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] text-center px-2">
+      <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mb-3">
+        <GraduationCapIcon className="w-7 h-7 text-green-600" />
       </div>
-    )}
-  </div>
-);
+      <h3 className="text-xl font-medium text-gray-900 mb-2">What can I help with?</h3>
+      <p className="text-gray-600 max-w-md mb-5 text-sm">
+        I'm here to help with your college admissions journey. Ask about colleges, applications, essays, or get personalized guidance.
+      </p>
+      
+      {onSuggestionClick && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full max-w-md">
+          {suggestions.map((suggestion, index) => (
+            <Button 
+              key={index}
+              variant="outline" 
+              className="justify-start text-xs md:text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 border-gray-200 py-2 px-3 h-auto"
+              onClick={() => onSuggestionClick(suggestion)}
+            >
+              {suggestion}
+            </Button>
+          ))}
+        </div>
+      )}
+      
+      {advancedMode !== undefined && (
+        <div className="mt-4 text-xs text-gray-500">
+          {advancedMode ? 
+            "Using advanced mode with detailed guidance prompts" : 
+            "Using basic mode with only student profile information"}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ThinkingIndicator = () => (
   <div className="flex w-full justify-start">
@@ -81,19 +106,67 @@ const StreamingMessage = ({ streamingText }: { streamingText: string }) => (
 );
 
 const WelcomeCard = ({ onCreateChat }: { onCreateChat: () => void }) => (
-  <div className="flex-1 flex items-center justify-center bg-gray-50">
-    <Card className="max-w-md">
-      <CardHeader>
-        <CardTitle className="text-2xl text-green-800">Welcome to 7Edu Counselor</CardTitle>
-        <CardDescription className="text-gray-600">Your personal college admissions guide</CardDescription>
+  <div className="flex-1 flex items-center justify-center bg-gray-50 p-2 md:p-4">
+    <Card className="max-w-3xl w-full">
+      <CardHeader className="text-center p-4 md:p-6">
+        <div className="mx-auto w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mb-3">
+          <GraduationCapIcon className="w-7 h-7 text-green-600" />
+        </div>
+        <CardTitle className="text-xl md:text-2xl text-green-800">Welcome to 7Edu College Counselor</CardTitle>
+        <CardDescription className="text-base text-gray-600 mt-2">
+          Your personal AI assistant for college admissions
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex items-center justify-center">
-        <Button 
-          onClick={onCreateChat}
-          className="mt-2 bg-green-600 hover:bg-green-700 text-white"
-        >
-          Start New Conversation
-        </Button>
+      <CardContent className="p-4 md:p-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
+              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
+                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Personalized College Lists
+              </h3>
+              <p className="text-gray-600 text-xs">
+                Get customized recommendations based on your profile, interests, and preferences.
+              </p>
+            </div>
+            
+            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
+              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
+                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Essay Guidance
+              </h3>
+              <p className="text-gray-600 text-xs">
+                Brainstorm essay topics and receive feedback to strengthen your applications.
+              </p>
+            </div>
+            
+            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
+              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
+                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Application Strategy
+              </h3>
+              <p className="text-gray-600 text-xs">
+                Develop a strategic timeline to maximize your admission chances.
+              </p>
+            </div>
+            
+            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
+              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
+                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Career Exploration
+              </h3>
+              <p className="text-gray-600 text-xs">
+                Explore potential majors and career paths aligned with your interests.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-center pt-2">
+            <Button 
+              onClick={onCreateChat}
+              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2"
+              size="lg"
+            >
+              Start a conversation
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   </div>
@@ -140,10 +213,9 @@ export default function ChatInterface() {
   
   // Create a new chat if none exists
   useEffect(() => {
-    if (!currentChatId) {
-      createNewChat();
-    }
-  }, [currentChatId, createNewChat]);
+    // Don't auto-create a chat when component mounts
+    // Let the user start from the welcome card
+  }, []);
 
   // Auto scroll to bottom when messages change or streaming text updates
   useEffect(() => {
@@ -175,6 +247,13 @@ export default function ChatInterface() {
   const toggleAdvancedMode = () => {
     setAdvancedMode(prev => !prev);
     console.log(`Switched to ${!advancedMode ? 'advanced' : 'basic'} system prompt mode`);
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = (text: string) => {
+    if (text && !isLoading && !isThinking && !isStreaming) {
+      handleSendMessage(text);
+    }
   };
 
   const handleSendMessage = async (message: string) => {
@@ -302,7 +381,7 @@ export default function ChatInterface() {
   const currentChat = getCurrentChat();
 
   if (!currentChat) {
-    return <WelcomeCard onCreateChat={createNewChat} />;
+    return <WelcomeCard onCreateChat={() => createNewChat()} />;
   }
 
   return (
@@ -310,7 +389,7 @@ export default function ChatInterface() {
       {/* Header */}
       <div className="p-4 border-b border-gray-200 bg-white shadow-sm flex-shrink-0">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-medium text-gray-900">{currentChat.title}</h2>
+          <h2 className="text-lg font-medium text-gray-900">{currentChat.title === 'New Conversation' ? 'Chat' : currentChat.title}</h2>
           
           {userProfile && (
             <div className="flex items-center space-x-2">
@@ -337,7 +416,10 @@ export default function ChatInterface() {
         <ScrollArea ref={scrollAreaRef} className="h-full" type="always">
           <div className="p-6 space-y-6">
             {currentChat.messages.length === 0 && !isThinking && !isStreaming && (
-              <EmptyChatPrompt advancedMode={userProfile ? advancedMode : undefined} />
+              <EmptyChatPrompt 
+                advancedMode={userProfile ? advancedMode : undefined} 
+                onSuggestionClick={handleSuggestionClick}
+              />
             )}
             
             {/* Existing chat messages */}

@@ -70,17 +70,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const createNewChat = () => {
     const id = Math.random().toString(36).substring(2, 9);
+    
+    // Create an empty chat with no initial messages
     const newChat: Chat = {
       id,
       title: 'New Conversation',
-      messages: [
-        {
-          id: Math.random().toString(36).substring(2, 9),
-          content: generateWelcomeMessage(userProfile),
-          role: 'system',
-          timestamp: Date.now(),
-        },
-      ],
+      messages: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
