@@ -11,6 +11,7 @@ interface ChatContextType {
   setCurrentChatId: (id: string | null) => void;
   createNewChat: () => string;
   deleteChat: (id: string) => void;
+  renameChat: (id: string, newTitle: string) => void;
   addMessage: (chatId: string, content: string, role: 'user' | 'system') => void;
   getChatList: () => Chat[];
   getCurrentChat: () => Chat | null;
@@ -106,6 +107,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const renameChat = (id: string, newTitle: string) => {
+    setChats((prevChats) => {
+      // If the chat doesn't exist, do nothing
+      if (!prevChats[id]) {
+        return prevChats;
+      }
+
+      // Update the chat title
+      const updatedChat = {
+        ...prevChats[id],
+        title: newTitle,
+        updatedAt: Date.now(),
+      };
+
+      return {
+        ...prevChats,
+        [id]: updatedChat,
+      };
+    });
+    
+    console.log(`Chat ${id} renamed to "${newTitle}"`);
+  };
+
   const addMessage = (chatId: string, content: string, role: 'user' | 'system') => {
     const newMessage: Message = {
       id: Math.random().toString(36).substring(2, 9),
@@ -189,6 +213,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setCurrentChatId,
         createNewChat,
         deleteChat,
+        renameChat,
         addMessage,
         getChatList,
         getCurrentChat,

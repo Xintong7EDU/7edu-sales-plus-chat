@@ -5,12 +5,21 @@ import { useChat } from '../app/lib/context/ChatContext';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { PlusIcon, Trash2Icon } from 'lucide-react';
+import { PlusIcon, Trash2Icon, PencilIcon, MoreVerticalIcon } from 'lucide-react';
 import { cn } from '@/app/lib/utils/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useState } from 'react';
 
 export default function ChatSidebar() {
-  const { currentChatId, setCurrentChatId, getChatList, createNewChat, deleteChat } = useChat();
+  const { currentChatId, setCurrentChatId, getChatList, createNewChat, deleteChat, renameChat } = useChat();
   const chatList = getChatList();
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
 
   const handleNewChat = () => {
     createNewChat();
@@ -23,6 +32,37 @@ export default function ChatSidebar() {
   const handleDeleteChat = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     deleteChat(id);
+    console.log('Deleted chat:', id);
+  };
+
+  const handleRenameClick = (e: React.MouseEvent, id: string, title: string) => {
+    e.stopPropagation();
+    setEditingChatId(id);
+    setEditTitle(title);
+    console.log('Renaming chat:', id);
+  };
+
+  const handleRenameSubmit = (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Trim the input and check if it's empty
+    const trimmedTitle = editTitle.trim();
+    if (trimmedTitle) {
+      renameChat(id, trimmedTitle);
+      console.log('Renamed chat to:', trimmedTitle);
+    }
+    
+    setEditingChatId(null);
+  };
+
+  const handleRenameBlur = (id: string) => {
+    const trimmedTitle = editTitle.trim();
+    if (trimmedTitle) {
+      renameChat(id, trimmedTitle);
+      console.log('Renamed chat on blur to:', trimmedTitle);
+    }
+    setEditingChatId(null);
   };
 
   return (
@@ -49,30 +89,69 @@ export default function ChatSidebar() {
                   <div 
                     onClick={() => handleChatSelect(chat.id)}
                     className={cn(
-                      "cursor-pointer px-3 py-2 hover:bg-gray-100 transition-colors relative flex items-center",
+                      "cursor-pointer px-3 py-2 hover:bg-gray-100 transition-colors relative group",
                       currentChatId === chat.id && "bg-green-50 border-l-4 border-green-600 pl-2"
                     )}
                   >
-                    <div className="pr-8 flex-1">
-                      <h3 className={cn(
-                        "text-sm font-medium truncate", 
-                        currentChatId === chat.id ? "text-green-800" : "text-gray-900"
-                      )}>
-                        {chat.title}
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {format(new Date(chat.updatedAt), 'MMM d, yyyy')}
-                      </p>
+                    <div className="flex items-center">
+                      <div className="flex-1 min-w-0 mr-1">
+                        {editingChatId === chat.id ? (
+                          <form onSubmit={(e) => handleRenameSubmit(e, chat.id)} onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              className="w-full text-sm p-1 border border-green-400 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                              autoFocus
+                              onBlur={() => handleRenameBlur(chat.id)}
+                            />
+                          </form>
+                        ) : (
+                          <>
+                            <h3 className={cn(
+                              "text-sm font-medium truncate", 
+                              currentChatId === chat.id ? "text-green-800" : "text-gray-900"
+                            )}>
+                              {chat.title}
+                            </h3>
+                            <p className="text-xs text-gray-500 mt-1 truncate">
+                              {format(new Date(chat.updatedAt), 'MMM d, yyyy')}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-transparent"
+                              aria-label="More options"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVerticalIcon className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuItem 
+                              onClick={(e) => handleRenameClick(e, chat.id, chat.title)}
+                              className="cursor-pointer flex items-center"
+                            >
+                              <PencilIcon className="h-4 w-4 mr-2" />
+                              <span>Rename</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={(e) => handleDeleteChat(e, chat.id)}
+                              className="cursor-pointer text-red-500 focus:text-red-500 flex items-center"
+                            >
+                              <Trash2Icon className="h-4 w-4 mr-2" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                    <Button
-                      onClick={(e) => handleDeleteChat(e, chat.id)}
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 h-6 w-6 text-gray-400 hover:text-red-500 hover:bg-transparent"
-                      aria-label="Delete chat"
-                    >
-                      <Trash2Icon className="h-4 w-4" />
-                    </Button>
                   </div>
                   <Separator />
                 </div>
