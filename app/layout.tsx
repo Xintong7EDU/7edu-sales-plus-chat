@@ -31,9 +31,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body
-        className={`${inter.variable} ${lexend.variable} font-sans antialiased h-full bg-white`}
+        className={`${inter.variable} ${lexend.variable} font-sans antialiased h-full bg-white overflow-x-hidden`}
       >
-        <div className="flex flex-col min-h-full">
+        <div className="flex flex-col h-full">
           <UserProvider>
             <ChatProvider>
               {children}

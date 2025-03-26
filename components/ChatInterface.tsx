@@ -6,12 +6,19 @@ import { useUser } from '../app/lib/context/UserContext';
 import ChatInput from './ChatInput';
 import ChatMessage from './ChatMessage';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { GraduationCapIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function ChatInterface() {
   const { userProfile } = useUser();
   const { currentChatId, createNewChat, addMessage, getCurrentChat } = useChat();
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   
   // Create a new chat if none exists
   useEffect(() => {
@@ -22,8 +29,20 @@ export default function ChatInterface() {
 
   // Auto scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (viewportRef.current) {
+      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+    }
   }, [getCurrentChat()?.messages]);
+
+  // Set up the viewportRef when ScrollArea is mounted
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewportRef.current = viewport as HTMLDivElement;
+      }
+    }
+  }, [scrollAreaRef.current]);
 
   const handleSendMessage = async (message: string) => {
     if (!currentChatId) return;
@@ -63,15 +82,8 @@ export default function ChatInterface() {
       // Add debug logging
       console.log('Chat history being sent to API:', formattedMessages);
       
-      // Check if user has completed onboarding
-      const isOnboardingComplete = userProfile.questionsLeft === 0 || 
-                                 (userProfile.answers && userProfile.answers.length >= 8);
-      
-      // Choose the appropriate API endpoint based on onboarding status
-      const apiEndpoint = isOnboardingComplete ? '/api/post-onboarding-chat' : '/api/chat';
-      
-      console.log(`Sending chat request to ${apiEndpoint} with user profile:`, 
-                  isOnboardingComplete ? 'Onboarding complete' : 'Onboarding incomplete');
+      // Choose the appropriate API endpoint
+      const apiEndpoint = '/api/post-onboarding-chat' 
       
       // Make API call to the appropriate OpenAI endpoint
       const response = await fetch(apiEndpoint, {
@@ -125,112 +137,108 @@ export default function ChatInterface() {
     return `Thank you for your message. I'm your 7Edu college counselor, but I notice you haven't completed your profile yet. To provide the most helpful and personalized advice for your college journey, I recommend completing the onboarding process. In the meantime, I can answer general questions about college admissions, applications, or specific schools. What would you like to know?`;
   };
 
-  // This is a simple placeholder function - in a real app, this would be an API call
-  const generateCounselorResponse = (userMessage: string, userProfile: any) => {
-    const lowercaseMessage = userMessage.toLowerCase();
-    
-    // Simple rule-based responses based on keywords and user profile
-    if (lowercaseMessage.includes('dream school') || lowercaseMessage.includes(userProfile.dreamSchool?.toLowerCase())) {
-      return `Based on your profile, I see your dream school is ${userProfile.dreamSchool}. For students interested in ${userProfile.dreamSchool}, I recommend focusing on maintaining a strong GPA, participating in extracurriculars related to your intended major (${userProfile.major}), and preparing thoroughly for standardized tests.`;
-    }
-    
-    if (lowercaseMessage.includes('gpa') || lowercaseMessage.includes('grades')) {
-      return `Your current GPA is ${userProfile.gpa} on a ${userProfile.gpaType} scale. This is a good foundation, but most competitive colleges look for upward trends and rigor in coursework. I suggest focusing on your weak subjects (${userProfile.weakSubjects?.join(', ')}) while maintaining your strengths in ${userProfile.strongSubjects?.join(', ')}.`;
-    }
-    
-    if (lowercaseMessage.includes('major') || lowercaseMessage.includes('study')) {
-      return `You've indicated interest in studying ${userProfile.major}. This is a great choice! Based on this, I recommend exploring internships, research opportunities, or extracurricular activities related to this field to strengthen your application.`;
-    }
-    
-    if (lowercaseMessage.includes('sat') || lowercaseMessage.includes('act') || lowercaseMessage.includes('test')) {
-      const satMessage = userProfile.satScore ? `Your SAT score is ${userProfile.satScore}.` : "You haven't reported an SAT score yet.";
-      const actMessage = userProfile.actScore ? `Your ACT score is ${userProfile.actScore}.` : "You haven't reported an ACT score yet.";
-      return `${satMessage} ${actMessage} For your target schools, you should aim for scores above the 75th percentile of admitted students. Would you like me to provide some test preparation strategies?`;
-    }
-    
-    return `Thank you for your question. As your college counselor, I'm here to help with your academic journey. Based on your profile (GPA: ${userProfile.gpa}, Dream School: ${userProfile.dreamSchool}, Intended Major: ${userProfile.major}), I can provide personalized guidance. What specific aspects of college applications or academic planning would you like to explore further?`;
-  };
-
   const currentChat = getCurrentChat();
 
   if (!currentChat) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl text-gray-500">Welcome to 7Edu Counselor Chat</h2>
-          <p className="text-gray-400 mt-2">Start a new conversation to begin</p>
-          <button
-            onClick={() => createNewChat()}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            New Chat
-          </button>
-        </div>
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl text-green-800">Welcome to 7Edu Counselor</CardTitle>
+            <CardDescription className="text-gray-600">Your personal college admissions guide</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center">
+            <Button 
+              onClick={() => createNewChat()}
+              className="mt-2 bg-green-600 hover:bg-green-700 text-white"
+            >
+              Start New Conversation
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200 bg-white">
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="p-4 border-b border-gray-200 bg-white shadow-sm flex-shrink-0">
         <h2 className="text-lg font-medium text-gray-900">{currentChat.title}</h2>
         {!userProfile && (
-          <div className="mt-1 text-xs text-orange-500 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-            Limited functionality. <Link href="/onboarding/form" className="text-blue-500 hover:underline ml-1">Complete your profile</Link> for personalized advice.
-          </div>
+          <Alert variant="destructive" className="mt-2 bg-orange-50 text-orange-600 border-orange-200">
+            <AlertTriangleIcon className="h-5 w-5" />
+            <AlertDescription>
+              Limited functionality available. <Link href="/onboarding/form" className="text-green-700 font-medium hover:underline">Complete your profile</Link> for personalized college counseling.
+            </AlertDescription>
+          </Alert>
         )}
         {userProfile && (
-          <div className={`mt-1 text-xs flex items-center ${
-            userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8)
-              ? 'text-green-600'
-              : 'text-blue-600'
-          }`}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
-              {userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8) ? (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9.344-2.198c-.376.023-.75.05-1.124.08C19.713 14.291 16.692 18 12 18c-4.61 0-7.629-3.621-8.022-7.292-.124-1.209-.588-2.293-.249-3.622.194-.759.437-1.439.875-1.716.577-.369.9.197.973.523.13.574 1.359 2.115 1.423 2.712.173 1.626.572 2.447.766 2.285.292-.243.176-1.426.207-1.926.033-.501.155-.961.694-.961h3.466c.539 0 .661.46.694.961.031.5-.085 1.683.207 1.926.194.162.593-.659.766-2.285.064-.597 1.293-2.138 1.423-2.712.073-.326.396-.892.973-.523.438.277.681.957.875 1.716.339 1.329-.125 2.413-.249 3.622-.393 3.67-3.413 7.292-8.022 7.292-4.692 0-7.713-3.709-8.22-7.368C2.806 10.703 2.432 10.676 2.056 10.652c-.378-.024-.74-.06-1.056-.102C4.186 2.563 11.61.59 16.064 2.771c4.455 2.18 5.3 9.03 4.936 7.881z" />
+          <Alert 
+            className={cn(
+              "mt-2",
+              userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8)
+                ? 'bg-green-50 text-green-700 border-green-200'
+                : 'bg-blue-50 text-blue-700 border-blue-200'
+            )}
+          >
+            {userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8) ? (
+              <CheckCircleIcon className="h-5 w-5" />
+            ) : (
+              <GraduationCapIcon className="h-5 w-5" />
+            )}
+            <AlertDescription>
+              {userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8)
+                ? 'Advanced counseling mode - Full profile analysis available'
+                : `Basic counseling mode - Onboarding ${8 - (userProfile.questionsLeft || 0)}/${8} complete`
+              }
+              {userProfile.questionsLeft > 0 && (
+                <Link href="/onboarding/chat" className="text-green-700 font-medium hover:underline ml-2">
+                  Complete onboarding
+                </Link>
               )}
-            </svg>
-            {userProfile.questionsLeft === 0 || (userProfile.answers && userProfile.answers.length >= 8)
-              ? 'Advanced counseling mode - Full profile analysis available'
-              : `Basic counseling mode - Onboarding ${8 - (userProfile.questionsLeft || 0)}/${8} complete`
-            }
-            {userProfile.questionsLeft > 0 && (
-              <Link href="/onboarding/chat" className="text-blue-500 hover:underline ml-1">
-                Complete onboarding
-              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+      
+      <div className="flex-1 bg-white overflow-hidden">
+        <ScrollArea ref={scrollAreaRef} className="h-full" type="always">
+          <div className="p-6 space-y-6">
+            {currentChat.messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <GraduationCapIcon className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">7Edu College Counselor</h3>
+                <p className="text-gray-600 max-w-md">I'm here to help with your college admissions journey. Ask me anything about colleges, applications, essays, or get personalized guidance.</p>
+              </div>
+            )}
+            
+            {currentChat.messages.map((message) => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
+            
+            {isLoading && (
+              <div className="flex w-full justify-start">
+                <div className="bg-gray-50 border border-gray-100 px-4 py-3 rounded-lg max-w-[80%]">
+                  <div className="flex space-x-2 items-center">
+                    <div className="animate-pulse flex space-x-2">
+                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
+                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
+                      <div className="h-2 w-2 bg-green-400 rounded-full"></div>
+                    </div>
+                    <span className="text-xs text-gray-500">Counselor is thinking...</span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-        )}
+        </ScrollArea>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-        {currentChat.messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
-        ))}
-        <div ref={messagesEndRef} />
-        
-        {isLoading && (
-          <div className="flex w-full justify-start mb-4">
-            <div className="bg-gray-100 text-gray-800 px-4 py-3 rounded-lg max-w-[80%]">
-              <div className="flex space-x-2 items-center">
-                <div className="animate-pulse flex space-x-2">
-                  <div className="h-2 w-2 bg-gray-400 rounded-full"></div>
-                  <div className="h-2 w-2 bg-gray-400 rounded-full"></div>
-                  <div className="h-2 w-2 bg-gray-400 rounded-full"></div>
-                </div>
-                <span className="text-xs text-gray-500">Counselor is typing...</span>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="flex-shrink-0">
+        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
-      
-      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
     </div>
   );
 } 

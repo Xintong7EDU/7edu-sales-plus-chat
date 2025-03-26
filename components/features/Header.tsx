@@ -25,7 +25,7 @@ export default function Header({ onShareClick, currentPage, rightContent }: Head
   ];
 
   return (
-    <header className={`py-4 ${getBgColor()}`}>
+    <header className={`py-4 ${getBgColor()} sticky top-0 z-50`}>
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center">
           <Link href="/" className={`text-2xl font-display font-bold ${getLogoColor()}`}>7Edu</Link>
