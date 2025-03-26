@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { GraduationCapIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
+import { GraduationCapIcon, AlertTriangleIcon, CheckCircleIcon, SettingsIcon } from 'lucide-react';
 import { cn } from '@/app/lib/utils/utils';
 import { sendStreamingChatRequest, formatStreamingMarkdown } from '@/app/lib/utils/streamUtils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export default function ChatInterface() {
   const { userProfile } = useUser();
@@ -23,6 +25,7 @@ export default function ChatInterface() {
   const [isThinking, setIsThinking] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [advancedMode, setAdvancedMode] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   
@@ -58,6 +61,12 @@ export default function ChatInterface() {
       }
     };
   }, [currentChatId, clearSystemTyping]);
+
+  // Toggle between basic and advanced system prompt modes
+  const toggleAdvancedMode = () => {
+    setAdvancedMode(prev => !prev);
+    console.log(`Switched to ${!advancedMode ? 'advanced' : 'basic'} system prompt mode`);
+  };
 
   const handleSendMessage = async (message: string) => {
     if (!currentChatId) return;
@@ -130,6 +139,7 @@ export default function ChatInterface() {
       
       // Add debug logging
       console.log('Chat history being sent to API:', formattedMessages);
+      console.log('Using advanced mode:', advancedMode);
       
       // Skip the thinking delay entirely
       setIsThinking(false);
@@ -167,7 +177,8 @@ export default function ChatInterface() {
             'Sorry, I encountered an error while processing your request. Please try again.',
             'system'
           );
-        }
+        },
+        advancedMode
       );
     } catch (error) {
       console.error('Error generating response:', error);
@@ -230,7 +241,26 @@ export default function ChatInterface() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b border-gray-200 bg-white shadow-sm flex-shrink-0">
-        <h2 className="text-lg font-medium text-gray-900">{currentChat.title}</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-medium text-gray-900">{currentChat.title}</h2>
+          
+          {userProfile && (
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="advancedMode" 
+                checked={advancedMode}
+                onCheckedChange={toggleAdvancedMode}
+              />
+              <Label htmlFor="advancedMode" className="text-sm text-gray-600">
+                {advancedMode ? 'Advanced Mode' : 'Basic Mode'}
+              </Label>
+              <div className="text-xs text-gray-500 cursor-help ml-1" title={advancedMode ? 'Using detailed guidance prompts' : 'Using only student profile summary'}>
+                <SettingsIcon className="w-4 h-4" />
+              </div>
+            </div>
+          )}
+        </div>
+        
         {!userProfile && (
           <Alert variant="destructive" className="mt-2 bg-orange-50 text-orange-600 border-orange-200">
             <AlertTriangleIcon className="h-5 w-5" />
@@ -278,6 +308,13 @@ export default function ChatInterface() {
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">7Edu College Counselor</h3>
                 <p className="text-gray-600 max-w-md">I'm here to help with your college admissions journey. Ask me anything about colleges, applications, essays, or get personalized guidance.</p>
+                {userProfile && (
+                  <div className="mt-4 text-sm text-gray-500">
+                    {advancedMode ? 
+                      "Using advanced mode with detailed guidance prompts" : 
+                      "Using basic mode with only student profile information"}
+                  </div>
+                )}
               </div>
             )}
             

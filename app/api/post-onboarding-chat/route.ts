@@ -5,16 +5,29 @@ import { UserProfile } from '@/app/types/onboarding';
 import { processMarkdownForDisplay } from '@/app/lib/utils/markdown';
 
 /**
- * API route for handling post-onboarding chat requests
- * Processes incoming messages and returns AI-generated responses
- * Uses a more conversational, personalized approach based on completed onboarding data
- * Supports both streaming and non-streaming responses
+ * API route for post-onboarding chat interactions
+ * 
+ * This endpoint serves as the bridge between the client and the OpenAI service.
+ * It receives chat messages from the client, validates the request, and then
+ * forwards the request to the appropriate service function based on whether
+ * streaming is requested.
+ * 
+ * Key responsibilities:
+ * 1. Validate incoming request data (messages, user profile)
+ * 2. Verify onboarding completion status
+ * 3. Route requests to either streaming or non-streaming handlers
+ * 4. Return properly formatted responses to the client
+ * 
+ * Relationships:
+ * - Uses postOnboardingChatService.ts for actual OpenAI interactions
+ * - Returns data that will be processed by streamUtils.ts on the client
+ * - Formats responses using markdown utilities for non-streaming responses
  */
 export async function POST(request: NextRequest) {
   try {
     console.log('Post-onboarding chat API called');
     const body = await request.json();
-    const { messages, userProfile, stream = false } = body;
+    const { messages, userProfile, stream = false, advancedMode = true } = body;
     
     // Validate request body
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -59,6 +72,7 @@ export async function POST(request: NextRequest) {
     console.log('Processing post-onboarding chat request for:', userProfile.name);
     console.log('Number of messages in conversation:', messages.length);
     console.log('Stream mode:', stream ? 'enabled' : 'disabled');
+    console.log('Advanced mode:', advancedMode ? 'enabled' : 'disabled');
     
     // Log the first few messages to understand conversation flow
     if (messages.length > 0) {
@@ -77,9 +91,9 @@ export async function POST(request: NextRequest) {
     }));
 
     try {
-      // Handle streaming response if requested
+      // STREAMING BRANCH: Handle streaming response if requested
       if (stream) {
-        // Create stream from OpenAI
+        // Create stream from OpenAI using the service
         const openaiStream = await streamPostOnboardingChatCompletion(
           formattedMessages,
           userProfile as UserProfile,
@@ -89,6 +103,7 @@ export async function POST(request: NextRequest) {
             presence_penalty: 0.7,
             frequency_penalty: 0.5,
             stream: true,
+            advancedMode,
           }
         );
 
@@ -96,6 +111,7 @@ export async function POST(request: NextRequest) {
         console.log('Returning streaming response');
         
         // Create a readable stream to process the OpenAI stream
+        // This is what the client's streamUtils.processStreamingResponse will consume
         const readableStream = new ReadableStream({
           async start(controller) {
             // Process each chunk from OpenAI stream
@@ -104,9 +120,8 @@ export async function POST(request: NextRequest) {
               const content = chunk.choices[0]?.delta?.content || '';
               
               if (content) {
-                // Convert text to readable format on the fly
-                // Note: For streaming, we'll process markdown on the client side
-                // to avoid partial parsing issues
+                // Send raw content chunks to the client
+                // Client-side streamUtils will handle formatting
                 controller.enqueue(new TextEncoder().encode(content));
               }
             }
@@ -122,7 +137,9 @@ export async function POST(request: NextRequest) {
             'Connection': 'keep-alive',
           },
         });
-      } else {
+      } 
+      // NON-STREAMING BRANCH: Standard response processing
+      else {
         // Generate standard response using the post-onboarding chat service
         const responseText = await generatePostOnboardingChatCompletion(
           formattedMessages,
@@ -131,13 +148,15 @@ export async function POST(request: NextRequest) {
             temperature: 0.8, // Slightly higher temperature for more varied responses
             max_tokens: 2000, // More tokens for detailed responses
             presence_penalty: 0.7,
-            frequency_penalty: 0.5
+            frequency_penalty: 0.5,
+            advancedMode,
           }
         );
 
         console.log('Successfully generated standard response');
         
         // Process markdown to HTML for better display
+        // For non-streaming, we format the markdown on the server
         const formattedResponse = processMarkdownForDisplay(responseText);
         
         // Return the response

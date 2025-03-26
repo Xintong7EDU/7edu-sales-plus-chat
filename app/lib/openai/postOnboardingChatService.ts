@@ -9,17 +9,29 @@ export const openai = new OpenAI({
   apiKey,
 });
 
+/**
+ * Configuration options for chat completions
+ * Used to customize both streaming and non-streaming responses
+ */
 interface ChatOptions {
   temperature?: number;
   max_tokens?: number;
   presence_penalty?: number;
   frequency_penalty?: number;
   stream?: boolean;
+  advancedMode?: boolean;
 }
 
 /**
  * Creates a summary of the student's profile and onboarding answers
  * for use in the system message context
+ * 
+ * This function transforms raw user profile data into a structured,
+ * human-readable summary that can be used to provide context to the AI
+ * about the specific student's background, interests, and academic profile.
+ * 
+ * @param userProfile Complete user profile with onboarding answers
+ * @returns Formatted string summary of the student's background
  */
 function createStudentSummary(userProfile: UserProfile): string {
   // Extract answers into a readable format
@@ -68,11 +80,35 @@ ${answersSummary || 'No personal information provided during onboarding'}
 
 /**
  * Creates a system message to provide context for the conversation
+ * 
+ * This function builds the crucial system prompt that guides the AI's behavior,
+ * incorporating the student's profile data and setting the tone and focus
+ * for the conversation. It has two modes:
+ * - Basic: Just includes student summary
+ * - Advanced: Includes detailed guidelines and role instructions
+ * 
+ * @param userProfile Complete user profile with onboarding answers
+ * @param advancedMode Whether to use the detailed system prompt (true) or basic mode (false)
+ * @returns Formatted system message with complete context
  */
-function createSystemMessage(userProfile: UserProfile): ChatCompletionMessageParam {
+function createSystemMessage(userProfile: UserProfile, advancedMode: boolean = true): ChatCompletionMessageParam {
   // Create a detailed student summary for the AI to reference
   const studentSummary = createStudentSummary(userProfile);
   
+  // Basic mode only includes the student summary
+  if (!advancedMode) {
+    return {
+      role: 'system',
+      content: `You are a professional college admissions counselor with 7Edu, providing guidance to students.
+
+Your student's detailed profile:
+${studentSummary}
+
+Please provide college counseling assistance based on this student's profile.`
+    };
+  }
+  
+  // Advanced mode includes the student summary plus detailed guidelines
   return {
     role: 'system',
     content: `You are a professional college admissions counselor with 7Edu, providing personalized guidance to students who have completed the onboarding process.
@@ -105,11 +141,19 @@ Special instructions:
 }
 
 /**
- * Generates a chat completion response for post-onboarding interactions
+ * Generates a complete chat completion response for post-onboarding interactions
+ * 
+ * This is the main non-streaming service function that:
+ * 1. Prepares messages with proper system context
+ * 2. Calls the OpenAI API to generate a response
+ * 3. Returns the complete formatted response
+ * 
+ * This function is called by the API route.ts when stream=false
+ * 
  * @param messages Array of message objects with role and content
  * @param userProfile User profile including onboarding answers
  * @param options Additional options for the OpenAI API
- * @returns The generated response text
+ * @returns The complete generated response text
  */
 export async function generatePostOnboardingChatCompletion(
   messages: ChatCompletionMessageParam[],
@@ -119,6 +163,7 @@ export async function generatePostOnboardingChatCompletion(
   try {
     console.log('Generating post-onboarding chat completion');
     console.log('Received messages count:', messages.length);
+    console.log('Advanced mode:', options.advancedMode !== false);
     
     // Make a deep copy of the messages array to avoid modifying the original
     let processedMessages = [...messages];
@@ -130,7 +175,7 @@ export async function generatePostOnboardingChatCompletion(
     // If no system message exists, add it as the first message
     if (!hasSystemMessage) {
       console.log('Adding system message');
-      const systemMessage = createSystemMessage(userProfile);
+      const systemMessage = createSystemMessage(userProfile, options.advancedMode !== false);
       processedMessages = [systemMessage, ...processedMessages];
     } else {
       // Log existing system message content
@@ -142,7 +187,7 @@ export async function generatePostOnboardingChatCompletion(
       
       // Replace with our system message to ensure proper context
       console.log('Replacing system message with updated context');
-      const systemMessage = createSystemMessage(userProfile);
+      const systemMessage = createSystemMessage(userProfile, options.advancedMode !== false);
       processedMessages = processedMessages.map(msg => 
         msg.role === 'system' ? systemMessage : msg
       );
@@ -192,8 +237,20 @@ export async function generatePostOnboardingChatCompletion(
 }
 
 /**
- * Creates a streaming chat completion
- * This function returns a stream that can be consumed by the client
+ * Creates a streaming chat completion from OpenAI
+ * 
+ * This function prepares and returns a stream of response tokens that can be
+ * consumed by the API route and forwarded to the client. It is the streaming
+ * counterpart to generatePostOnboardingChatCompletion.
+ * 
+ * This function is called by the API route.ts when stream=true, and its output
+ * is processed by the ReadableStream in route.ts and eventually by streamUtils.ts
+ * on the client side.
+ * 
+ * @param messages Array of message objects with role and content
+ * @param userProfile User profile including onboarding answers
+ * @param options Additional options for the OpenAI API
+ * @returns Stream of completion tokens from OpenAI
  */
 export async function streamPostOnboardingChatCompletion(
   messages: ChatCompletionMessageParam[],
@@ -203,6 +260,7 @@ export async function streamPostOnboardingChatCompletion(
   try {
     console.log('Streaming post-onboarding chat completion');
     console.log('Received messages count:', messages.length);
+    console.log('Advanced mode:', options.advancedMode !== false);
     
     // Make a deep copy of the messages array to avoid modifying the original
     let processedMessages = [...messages];
@@ -213,11 +271,11 @@ export async function streamPostOnboardingChatCompletion(
     // If no system message exists, add it as the first message
     if (!hasSystemMessage) {
       console.log('Adding system message for streaming');
-      const systemMessage = createSystemMessage(userProfile);
+      const systemMessage = createSystemMessage(userProfile, options.advancedMode !== false);
       processedMessages = [systemMessage, ...processedMessages];
     } else {
       // Replace with our system message to ensure proper context
-      const systemMessage = createSystemMessage(userProfile);
+      const systemMessage = createSystemMessage(userProfile, options.advancedMode !== false);
       processedMessages = processedMessages.map(msg => 
         msg.role === 'system' ? systemMessage : msg
       );
