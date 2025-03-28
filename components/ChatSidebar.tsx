@@ -5,14 +5,8 @@ import { useChat } from '../app/lib/context/ChatContext';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { PlusIcon, Trash2Icon, PencilIcon, MoreVerticalIcon, ChevronRightIcon } from 'lucide-react';
+import { PlusIcon, Trash2Icon, PencilIcon, ChevronRightIcon } from 'lucide-react';
 import { cn } from '@/app/lib/utils/utils';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useState, useEffect, useRef } from 'react';
 
 export default function ChatSidebar() {
@@ -162,36 +156,25 @@ export default function ChatSidebar() {
                             </>
                           )}
                         </div>
-                        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-transparent"
-                                aria-label="More options"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVerticalIcon className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-36">
-                              <DropdownMenuItem 
-                                onClick={(e) => handleRenameClick(e, chat.id, chat.title)}
-                                className="cursor-pointer flex items-center"
-                              >
-                                <PencilIcon className="h-4 w-4 mr-2" />
-                                <span>Rename</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={(e) => handleDeleteChat(e, chat.id)}
-                                className="cursor-pointer text-red-500 focus:text-red-500 flex items-center"
-                              >
-                                <Trash2Icon className="h-4 w-4 mr-2" />
-                                <span>Delete</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-gray-400 hover:text-gray-600 hover:bg-transparent"
+                            aria-label="Rename chat"
+                            onClick={(e) => handleRenameClick(e, chat.id, chat.title)}
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-transparent"
+                            aria-label="Delete chat"
+                            onClick={(e) => handleDeleteChat(e, chat.id)}
+                          >
+                            <Trash2Icon className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
