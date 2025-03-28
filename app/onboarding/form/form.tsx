@@ -525,7 +525,7 @@ export default function OnboardingFormPage() {
               </div>
 
               {/* Regular Courses Section */}
-              <div className="space-y-4 pt-4 border-t border-gray-100">
+              {/* <div className="space-y-4 pt-4 border-t border-gray-100">
                 <h2 className="text-lg font-bold flex items-center">
                   <BookText className="mr-2 h-5 w-5 text-green-600" />
                   Regular Courses
@@ -600,7 +600,7 @@ export default function OnboardingFormPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </div> */}
 
               {/* Courses Section */}
               <div className="space-y-4 pt-4 border-t border-gray-100">

@@ -13,15 +13,11 @@ import {
   Target,
   Clock,
   BookOpen,
-  ArrowRight,
   AlertCircle,
   BarChart,
   GraduationCap,
   Users,
   Star,
-  Printer,
-  Download,
-  Share2,
   Sun,
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -183,6 +179,15 @@ export default function OnboardingAnalysisPage() {
 
         <div className="mx-auto">
           <h1 className="text-2xl font-display font-bold mb-6 text-center">Your College Readiness Analysis</h1>
+          
+          {/* Add registration button at the top */}
+          <div className="flex justify-center mb-6">
+            <Link href="/dashboard/profile">
+              <Button className="bg-green-600 hover:bg-green-700">
+                Click to register account
+              </Button>
+            </Link>
+          </div>
 
           {loading ? (
             <LoadingState />
@@ -229,7 +234,7 @@ export default function OnboardingAnalysisPage() {
                     </TabsContent>
 
                     <TabsContent value="colleges" className="mt-0 space-y-6">
-                      <CollegeRecommendations userProfile={userProfile} analysis={analysis} />
+                      <CollegeRecommendations analysis={analysis} />
                     </TabsContent>
 
                     <TabsContent value="action-plan" className="mt-0 space-y-6">
@@ -339,23 +344,11 @@ function AcademicAnalysis({ analysis, onViewActionPlan }: { analysis: AnalysisRe
           </div>
         </div>
       </div>
-
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h3 className="text-base font-semibold mb-3">Next Steps</h3>
-        <p className="text-sm text-gray-700 mb-4">
-          Based on your academic profile, we recommend scheduling a consultation to discuss your college readiness and develop a personalized action plan.
-        </p>
-        <div className="flex justify-center">
-          <Button className="bg-green-600 hover:bg-green-700">
-            Schedule Academic Consultation
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }
 
-function CollegeRecommendations({ userProfile, analysis }: { userProfile: any; analysis: AnalysisResult }) {
+function CollegeRecommendations({ analysis }: { analysis: AnalysisResult }) {
   return (
     <div className="space-y-5">
       <h2 className="text-lg font-bold mb-4 flex items-center">
@@ -478,12 +471,6 @@ function ActionPlan({ analysis }: { analysis: AnalysisResult }) {
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="mt-6 flex justify-center">
-        <Button className="bg-green-600 hover:bg-green-700">
-          Schedule Action Plan Review
-        </Button>
       </div>
     </div>
   )
