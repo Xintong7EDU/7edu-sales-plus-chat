@@ -25,4 +25,5 @@ export interface UserProfile extends OnboardingFormData {
   questionsAsked: number;
   questionsLeft: number;
   answers?: QuestionAnswer[];
+  honors?: string[];
 } 

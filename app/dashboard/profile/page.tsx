@@ -12,14 +12,12 @@ import {
   CardHeader, 
   CardTitle 
 } from '../../../components/ui/card';
-import { Separator } from '../../../components/ui/separator';
 import { Button } from '../../../components/ui/button';
 import { Progress } from '../../../components/ui/progress';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { Badge } from '../../../components/ui/badge';
 import { Avatar, AvatarFallback } from '../../../components/ui/avatar';
 import { ScrollArea } from '../../../components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -27,7 +25,8 @@ import {
   LineElement,
   Filler,
   Tooltip,
-  Legend
+  Legend,
+  TooltipItem
 } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
 
@@ -88,7 +87,7 @@ export default function ProfilePage() {
             </Avatar>
           </div>
           <h3 className="text-lg font-medium mb-2">No Profile Information</h3>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">You haven't completed the onboarding process yet. Please complete it to create your profile.</p>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">You haven&apos;t completed the onboarding process yet. Please complete it to create your profile.</p>
         </CardContent>
         <CardFooter className="flex justify-center">
           <Button asChild>
@@ -110,15 +109,22 @@ export default function ProfilePage() {
 
   const progressPercentage = Math.round((profile.questionsAsked / (profile.questionsAsked + profile.questionsLeft) * 100) || 0);
   
-  // Create radar chart data based on student's profile
-  // We'll use this to visualize academic strengths and areas for improvement
-  const generateSkillScore = (subjects: string[] | undefined) => subjects?.length || 0;
+  // Create radar chart data based on student's profile metrics
+  // Calculate values for each of the 6 metrics on a scale of 0-5
 
-  // Get the GPA as a number for the radar chart (default to 3.0 if not available)
+  // 1. ACADEMICS
+  // Get the GPA as a number for radar chart (default to 3.0 if not available)
   const gpaValue = profile.gpa ? parseFloat(profile.gpa) : 3.0;
   // Scale GPA to a value between 0-5 for consistency with other metrics
   const scaledGpa = Math.min(gpaValue * (5/4), 5);
   
+  // Calculate curriculum rigor based on AP courses
+  const apRigor = Math.min((profile.apCourses?.length || 0) / 2, 5); // Scale AP count, max of 5
+  
+  // Calculate total academic score (combination of GPA and curriculum rigor)
+  const academicsScore = ((scaledGpa * 0.6) + (apRigor * 0.4));
+
+  // 2. TEST PREP
   // Convert SAT score to a value between 0-5 (assuming max score of 1600)
   const satValue = profile.satScore ? parseInt(profile.satScore) : 0;
   const scaledSat = satValue ? (satValue / 1600) * 5 : 0;
@@ -127,41 +133,116 @@ export default function ProfilePage() {
   const actValue = profile.actScore ? parseInt(profile.actScore) : 0;
   const scaledAct = actValue ? (actValue / 36) * 5 : 0;
   
-  // Use the better of SAT or ACT for the radar chart
-  const standardizedTestScore = Math.max(scaledSat, scaledAct);
+  // Use the better of SAT or ACT for the test prep score
+  const testPrepScore = Math.max(scaledSat, scaledAct);
 
-  // Calculate academic engagement score based on total courses
-  const totalCourses = (profile.regularCourses?.length || 0) + (profile.apCourses?.length || 0);
-  const academicEngagement = Math.min(totalCourses / 2, 5); // Scale engagement, max of 5
+  // 3. COMMUNITY INVOLVEMENT
+  // This would ideally come from the answers to relevant questions
+  // For now, we'll use a placeholder calculation based on available data
+  // In a real implementation, this would use data from answers or other profile fields
+  // Analyze answers for community involvement keywords
+  const communityInvolvementScore = profile.answers
+    ? Math.min(profile.answers.reduce((score, qa) => {
+        const answer = qa.answer.toLowerCase();
+        // Look for keywords related to community involvement
+        if (answer.includes('volunteer') || 
+            answer.includes('community') || 
+            answer.includes('service') ||
+            answer.includes('leadership') ||
+            answer.includes('president') ||
+            answer.includes('founder') ||
+            answer.includes('organization')) {
+          return score + 1;
+        }
+        return score;
+      }, 0), 5)
+    : 0;
+
+  // 4. CHARACTER BUILDING VIA EXPERIENTIAL LEARNING
+  // Similar to community involvement, we'll analyze answers for relevant keywords
+  const experientialLearningScore = profile.answers
+    ? Math.min(profile.answers.reduce((score, qa) => {
+        const answer = qa.answer.toLowerCase();
+        // Look for keywords related to experiential learning
+        if (answer.includes('research') || 
+            answer.includes('project') || 
+            answer.includes('work experience') ||
+            answer.includes('job') ||
+            answer.includes('intern') ||
+            answer.includes('summer') ||
+            answer.includes('program')) {
+          return score + 1;
+        }
+        return score;
+      }, 0), 5)
+    : 0;
+
+  // 5. HONORS AND AWARDS
+  // Calculate score based on honors field and relevant keywords in answers
+  const honorsBaseScore = profile.honors ? Math.min(profile.honors.length, 4) : 0;
+  const honorsAnswersScore = profile.answers
+    ? Math.min(profile.answers.reduce((score, qa) => {
+        const answer = qa.answer.toLowerCase();
+        // Look for keywords related to honors and awards
+        if (answer.includes('award') || 
+            answer.includes('honor') || 
+            answer.includes('recognition') ||
+            answer.includes('prize') ||
+            answer.includes('medal') ||
+            answer.includes('certificate') ||
+            answer.includes('scholarship') ||
+            answer.includes('won')) {
+          return score + 1;
+        }
+        return score;
+      }, 0), 5)
+    : 0;
   
-  // Calculate AP rigor (how many AP classes they take)
-  const apRigor = Math.min((profile.apCourses?.length || 0) / 2, 5); // Scale AP count, max of 5
-  
-  // Calculate academic strengths score
-  const strengthScore = Math.min((profile.strongSubjects?.length || 0) / 2, 5);
-  
-  // Calculate areas for improvement score (inverted - less weak subjects = higher score)
-  const improvementScore = 5 - Math.min((profile.weakSubjects?.length || 0) / 2, 5);
+  // Combine both scores, but cap at 5
+  const honorsAndAwardsScore = Math.min(honorsBaseScore + (honorsAnswersScore * 0.5), 5);
+
+  // 6. SPECIAL TALENTS
+  // Analyze answers for special talents and skills
+  const specialTalentsScore = profile.answers
+    ? Math.min(profile.answers.reduce((score, qa) => {
+        const answer = qa.answer.toLowerCase();
+        // Look for keywords related to special talents
+        if (answer.includes('music') || 
+            answer.includes('instrument') || 
+            answer.includes('art') ||
+            answer.includes('dance') ||
+            answer.includes('sing') ||
+            answer.includes('perform') ||
+            answer.includes('sport') ||
+            answer.includes('athlete') ||
+            answer.includes('team') ||
+            answer.includes('player') ||
+            answer.includes('varsity')) {
+          return score + 1;
+        }
+        return score;
+      }, 0), 5)
+    : 0;
 
   const radarData = {
     labels: [
-      'GPA', 
-      'Test Scores', 
-      'Academic Engagement', 
-      'AP Rigor',
-      'Academic Strengths',
-      'Areas for Improvement'
+      'Academics', 
+      'Test Prep', 
+      'Community Involvement', 
+      'Experiential Learning',
+      'Honors & Awards',
+      'Special Talents'
     ],
     datasets: [
       {
-        label: 'Student Performance',
+        label: 'College Admissions Profile',
         data: [
-          scaledGpa, 
-          standardizedTestScore, 
-          academicEngagement, 
-          apRigor,
-          strengthScore,
-          improvementScore
+          academicsScore, 
+          testPrepScore, 
+          communityInvolvementScore, 
+          experientialLearningScore,
+          honorsAndAwardsScore,
+          specialTalentsScore
         ],
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
         borderColor: 'rgba(75, 192, 192, 1)',
@@ -185,8 +266,69 @@ export default function ProfilePage() {
     plugins: {
       tooltip: {
         callbacks: {
-          label: function(context: any) {
-            return `${context.dataset.label}: ${context.raw.toFixed(1)}/5`;
+          title: function(tooltipItems: TooltipItem<'radar'>[]) {
+            const titles: Record<string, string> = {
+              'Academics': 'Academic Performance & Rigor',
+              'Test Prep': 'Standardized Test Performance',
+              'Community Involvement': 'Service & Community Leadership',
+              'Experiential Learning': 'Character Building & Experiences',
+              'Honors & Awards': 'Recognitions & Achievements',
+              'Special Talents': 'Distinctive Skills & Abilities'
+            };
+            
+            return titles[tooltipItems[0].label] || tooltipItems[0].label;
+          },
+          label: function(context: TooltipItem<'radar'>) {
+            const score = (context.raw as number).toFixed(1);
+            const metrics = [
+              `${context.dataset.label}: ${score}/5`,
+              '-------------------'
+            ];
+            
+            // Add detailed explanation based on which metric
+            switch(context.label) {
+              case 'Academics':
+                metrics.push('Factors included:');
+                metrics.push(`• GPA: ${profile.gpa || 'Not specified'}`);
+                metrics.push(`• AP Courses: ${profile.apCourses?.length || 0}`);
+                metrics.push(`• Regular Courses: ${profile.regularCourses?.length || 0}`);
+                break;
+              case 'Test Prep':
+                metrics.push('Best scores from:');
+                if (profile.satScore) metrics.push(`• SAT: ${profile.satScore}`);
+                if (profile.actScore) metrics.push(`• ACT: ${profile.actScore}`);
+                if (!profile.satScore && !profile.actScore) metrics.push('• No test scores provided');
+                break;
+              case 'Community Involvement':
+                metrics.push('Based on volunteering, leadership,');
+                metrics.push('and community service activities');
+                metrics.push('mentioned in your answers.');
+                break;
+              case 'Experiential Learning':
+                metrics.push('Based on research, work experience,');
+                metrics.push('internships, and projects');
+                metrics.push('mentioned in your answers.');
+                break;
+              case 'Honors & Awards':
+                metrics.push('Based on awards, scholarships,');
+                metrics.push('and recognitions mentioned');
+                metrics.push('in your answers.');
+                if (profile.honors && profile.honors.length > 0) {
+                  metrics.push('');
+                  metrics.push('Your honors include:');
+                  profile.honors.forEach(honor => {
+                    metrics.push(`• ${honor}`);
+                  });
+                }
+                break;
+              case 'Special Talents':
+                metrics.push('Based on athletics, music, arts,');
+                metrics.push('and other special skills mentioned');
+                metrics.push('in your answers.');
+                break;
+            }
+            
+            return metrics;
           }
         }
       }
@@ -206,8 +348,8 @@ export default function ProfilePage() {
         {/* Radar Chart */}
         <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle>Academic Profile Visualization</CardTitle>
-            <CardDescription>A holistic view of your academic strengths and areas for growth</CardDescription>
+            <CardTitle>College Admissions Profile</CardTitle>
+            <CardDescription>A holistic view of your strengths for college applications</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center items-center p-4">
             <div className="w-full h-[400px]">
@@ -215,7 +357,7 @@ export default function ProfilePage() {
             </div>
           </CardContent>
           <CardFooter className="text-sm text-muted-foreground">
-            <p>This radar chart visualizes different aspects of your academic profile on a scale of 0-5.</p>
+            <p>This radar chart visualizes six key admissions factors on a scale of 0-5.</p>
           </CardFooter>
         </Card>
 
@@ -258,6 +400,18 @@ export default function ProfilePage() {
               <ProfileItem label="Weak subjects" value={weakSubjects} />
               <ProfileItem label="Regular courses" value={regularCourses} />
               <ProfileItem label="AP courses" value={apCourses} />
+              <ProfileItem 
+                label="Honors & Awards" 
+                value={
+                  profile.honors && profile.honors.length > 0 
+                    ? profile.honors.map((honor, index) => (
+                        <Badge key={index} variant="outline" className="mr-2 mb-1">
+                          {honor}
+                        </Badge>
+                      ))
+                    : 'None specified'
+                } 
+              />
               <ProfileItem 
                 label="Questions progress" 
                 value={
@@ -321,7 +475,7 @@ export default function ProfilePage() {
                 </div>
                 <h3 className="text-lg font-medium mb-2">No Answers Yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  You haven't answered any assessment questions yet. Complete questions to see your responses here.
+                  You haven&apos;t answered any assessment questions yet. Complete questions to see your responses here.
                 </p>
                 <Button asChild>
                   <Link href="/dashboard/questions">Answer Questions</Link>
