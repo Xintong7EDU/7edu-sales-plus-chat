@@ -13,6 +13,7 @@
  */
 
 import { processMarkdownForDisplay } from './markdown';
+import { DEFAULT_TOGETHER_AI_MODEL } from '@/app/lib/constants/models';
 
 /**
  * Processes a streaming response from the API
@@ -167,4 +168,93 @@ export async function sendStreamingChatRequest(
     console.error('Error in streaming chat request:', error);
     onError?.(error as Error);
   }
-} 
+}
+
+/**
+ * Sends a streaming chat request to the Together AI API
+ * 
+ * This function works similarly to sendStreamingChatRequest but uses the
+ * Together AI endpoint instead of OpenAI. It allows for model customization
+ * through the model parameter.
+ * 
+ * @param messages The chat messages to send to the API
+ * @param userProfile The user profile data needed for personalization
+ * @param onChunk Callback for each text chunk received from the stream
+ * @param onComplete Callback for when streaming is complete
+ * @param onError Callback for handling any errors
+ * @param advancedMode Whether to use the advanced system prompt mode
+ * @param model The Together AI model to use for the request
+ */
+export async function sendTogetherAiStreamingChatRequest(
+  messages: Array<{ role: string; content: string }>,
+  userProfile: any,
+  onChunk: (text: string) => void,
+  onComplete?: (fullText: string) => void,
+  onError?: (error: Error) => void,
+  advancedMode: boolean = true,
+  model: string = DEFAULT_TOGETHER_AI_MODEL
+): Promise<void> {
+  try {
+    console.log('Sending Together AI streaming chat request');
+    console.log(`Using Together AI model: ${model}`);
+    console.log('Using advanced mode:', advancedMode);
+    
+    // More thorough validation of message array
+    if (!messages || messages.length === 0) {
+      console.error('Message array is empty or undefined');
+      onError?.(new Error('No messages to send'));
+      return;
+    }
+    
+    // Validate that there's at least one user message
+    const hasUserMessage = messages.some(msg => msg.role === 'user');
+    if (!hasUserMessage) {
+      console.error('No user messages found in the chat history for API request');
+      onError?.(new Error('Cannot send a request without a user message. Please type a message first.'));
+      return;
+    }
+    
+    // Ensure the most recent non-system message is a user message
+    const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+    const lastNonSystemMessage = nonSystemMessages[nonSystemMessages.length - 1];
+    
+    if (!lastNonSystemMessage || lastNonSystemMessage.role !== 'user') {
+      console.error('The most recent non-system message is not from the user');
+      console.log('Messages array structure issue - fixing order not implemented');
+    }
+    
+    // Log complete message array for debugging
+    console.log('Complete message array being sent to Together AI API:');
+    messages.forEach((msg, index) => {
+      console.log(`[${index}] ${msg.role}: ${typeof msg.content === 'string' ? 
+        (msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content) : 
+        'Content is not a string'}`);
+    });
+    
+    // Call the API endpoint in route.ts
+    const response = await fetch('/api/together-ai-chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages,
+        userProfile,
+        stream: true,  // Critical flag that tells the API to stream the response
+        advancedMode,
+        model,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to send Together AI chat request');
+    }
+    
+    // Process the streaming response using the utility function
+    await processStreamingResponse(response, onChunk, onComplete, onError);
+  } catch (error) {
+    console.error('Error in Together AI streaming chat request:', error);
+    onError?.(error as Error);
+  }
+}

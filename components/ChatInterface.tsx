@@ -9,15 +9,22 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { GraduationCapIcon, AlertTriangleIcon, SettingsIcon } from 'lucide-react';
-import { sendStreamingChatRequest, formatStreamingMarkdown } from '@/app/lib/utils/streamUtils';
+import { GraduationCapIcon, AlertTriangleIcon, SettingsIcon, ServerIcon } from 'lucide-react';
+import { sendStreamingChatRequest, sendTogetherAiStreamingChatRequest, formatStreamingMarkdown } from '@/app/lib/utils/streamUtils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DEFAULT_TOGETHER_AI_MODEL } from '@/app/lib/constants/models';
 
 // Components
-const EmptyChatPrompt = ({ advancedMode, onSuggestionClick }: { advancedMode?: boolean, onSuggestionClick?: (text: string) => void }) => {
+const EmptyChatPrompt = ({ advancedMode, onSuggestionClick, useTogetherAi, togetherAiModel }: { 
+  advancedMode?: boolean, 
+  onSuggestionClick?: (text: string) => void,
+  useTogetherAi?: boolean,
+  togetherAiModel?: string
+}) => {
   const suggestions = [
     "College Lists",
     "Essay topics",
@@ -55,6 +62,12 @@ const EmptyChatPrompt = ({ advancedMode, onSuggestionClick }: { advancedMode?: b
           {advancedMode ? 
             "Using advanced mode with detailed guidance prompts" : 
             "Using basic mode with only student profile information"}
+        </div>
+      )}
+
+      {useTogetherAi !== undefined && (
+        <div className="mt-2 text-xs text-gray-500">
+          Powered by: {useTogetherAi ? (togetherAiModel ? togetherAiModel : "Together AI") : "OpenAI"}
         </div>
       )}
     </div>
@@ -139,6 +152,8 @@ export default function ChatInterface() {
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(true);
+  const [useTogetherAi, setUseTogetherAi] = useState(false);
+  const [togetherAiModel, setTogetherAiModel] = useState(DEFAULT_TOGETHER_AI_MODEL);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   
@@ -180,6 +195,12 @@ export default function ChatInterface() {
   const toggleAdvancedMode = () => {
     setAdvancedMode(prev => !prev);
     console.log(`Switched to ${!advancedMode ? 'advanced' : 'basic'} system prompt mode`);
+  };
+
+  // Toggle between OpenAI and Together AI
+  const toggleAiProvider = () => {
+    setUseTogetherAi(prev => !prev);
+    console.log(`Switched to ${!useTogetherAi ? 'Together AI' : 'OpenAI'}`);
   };
 
   // Handle suggestion click
@@ -264,37 +285,69 @@ export default function ChatInterface() {
       
       console.log('Chat history being sent to API:', formattedMessages);
       console.log('Using advanced mode:', advancedMode);
+      console.log('Using AI provider:', useTogetherAi ? 'LLAMA' : 'GPT');
       
       setIsThinking(false);
       setIsStreaming(true);
       
-      // Use the streaming utility
-      await sendStreamingChatRequest(
-        formattedMessages,
-        userProfile,
-        (chunk) => {
-          if (isThinking) {
-            setIsThinking(false);
-          }
-          setStreamingText(prev => prev + chunk);
-        },
-        (fullText) => {
-          addMessage(currentChatId, fullText, 'system');
-          setIsStreaming(false);
-          setIsLoading(false);
-        },
-        (error) => {
-          console.error('Streaming error:', error);
-          setIsStreaming(false);
-          setIsLoading(false);
-          addMessage(
-            currentChatId,
-            'Sorry, I encountered an error while processing your request. Please try again.',
-            'system'
-          );
-        },
-        advancedMode
-      );
+      // Use the appropriate streaming utility based on the selected provider
+      if (useTogetherAi) {
+        await sendTogetherAiStreamingChatRequest(
+          formattedMessages,
+          userProfile,
+          (chunk) => {
+            if (isThinking) {
+              setIsThinking(false);
+            }
+            setStreamingText(prev => prev + chunk);
+          },
+          (fullText) => {
+            addMessage(currentChatId, fullText, 'system');
+            setIsStreaming(false);
+            setIsLoading(false);
+          },
+          (error) => {
+            console.error('Together AI streaming error:', error);
+            setIsStreaming(false);
+            setIsLoading(false);
+            addMessage(
+              currentChatId,
+              'Sorry, I encountered an error while processing your request with Together AI. Please try again or switch to OpenAI.',
+              'system'
+            );
+          },
+          advancedMode,
+          togetherAiModel
+        );
+      } else {
+        // Use the OpenAI streaming utility
+        await sendStreamingChatRequest(
+          formattedMessages,
+          userProfile,
+          (chunk) => {
+            if (isThinking) {
+              setIsThinking(false);
+            }
+            setStreamingText(prev => prev + chunk);
+          },
+          (fullText) => {
+            addMessage(currentChatId, fullText, 'system');
+            setIsStreaming(false);
+            setIsLoading(false);
+          },
+          (error) => {
+            console.error('OpenAI streaming error:', error);
+            setIsStreaming(false);
+            setIsLoading(false);
+            addMessage(
+              currentChatId,
+              'Sorry, I encountered an error while processing your request with OpenAI. Please try again or switch to Together AI.',
+              'system'
+            );
+          },
+          advancedMode
+        );
+      }
     } catch (error) {
       console.error('Error generating response:', error);
       setIsThinking(false);
@@ -330,17 +383,57 @@ export default function ChatInterface() {
           <h2 className="text-lg font-medium text-gray-900">{currentChat.title === 'New Conversation' ? 'Chat' : currentChat.title}</h2>
           
           {userProfile && (
-            <div className="flex items-center space-x-2">
-              <Switch 
-                id="advancedMode" 
-                checked={advancedMode}
-                onCheckedChange={toggleAdvancedMode}
-              />
-              <Label htmlFor="advancedMode" className="text-sm text-gray-600">
-                {advancedMode ? 'Advanced Mode' : 'Basic Mode'}
-              </Label>
-              <div className="text-xs text-gray-500 cursor-help ml-1" title={advancedMode ? 'Using detailed guidance prompts' : 'Using only student profile summary'}>
-                <SettingsIcon className="w-4 h-4" />
+            <div className="flex items-center space-x-4">
+              {/* Advanced Mode Toggle */}
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="advancedMode" 
+                  checked={advancedMode}
+                  onCheckedChange={toggleAdvancedMode}
+                />
+                <Label htmlFor="advancedMode" className="text-sm text-gray-600">
+                  {advancedMode ? 'Advanced Mode' : 'Basic Mode'}
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-xs text-gray-500 cursor-help">
+                        <SettingsIcon className="w-4 h-4" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs w-48">{advancedMode ? 'Using detailed guidance prompts' : 'Using only student profile summary'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              
+              {/* AI Provider Toggle */}
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="aiProvider" 
+                  checked={useTogetherAi}
+                  onCheckedChange={toggleAiProvider}
+                />
+                <Label htmlFor="aiProvider" className="text-sm text-gray-600">
+                  {useTogetherAi ? 'LLAMA' : 'GPT'}
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-xs text-gray-500 cursor-help">
+                        <ServerIcon className="w-4 h-4" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs w-48">
+                        {useTogetherAi 
+                          ? `Using Together AI model: ${togetherAiModel}` 
+                          : "Using OpenAI"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
           )}
@@ -357,6 +450,8 @@ export default function ChatInterface() {
               <EmptyChatPrompt 
                 advancedMode={userProfile ? advancedMode : undefined} 
                 onSuggestionClick={handleSuggestionClick}
+                useTogetherAi={userProfile ? useTogetherAi : undefined}
+                togetherAiModel={userProfile ? togetherAiModel : undefined}
               />
             )}
             
