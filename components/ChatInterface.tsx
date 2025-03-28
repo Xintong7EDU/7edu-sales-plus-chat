@@ -8,10 +8,8 @@ import ChatMessage from './ChatMessage';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { GraduationCapIcon, AlertTriangleIcon, CheckCircleIcon, SettingsIcon } from 'lucide-react';
-import { cn } from '@/app/lib/utils/utils';
+import { GraduationCapIcon, AlertTriangleIcon, SettingsIcon } from 'lucide-react';
 import { sendStreamingChatRequest, formatStreamingMarkdown } from '@/app/lib/utils/streamUtils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
@@ -21,10 +19,10 @@ import { Label } from '@/components/ui/label';
 // Components
 const EmptyChatPrompt = ({ advancedMode, onSuggestionClick }: { advancedMode?: boolean, onSuggestionClick?: (text: string) => void }) => {
   const suggestions = [
-    "What colleges match my profile?",
-    "Help me brainstorm essay topics",
-    "How can I improve my extracurriculars?",
-    "Compare UC Berkeley and Stanford"
+    "College Lists",
+    "Essay topics",
+    "Improve extracurriculars",
+    "Compare colleges"
   ];
 
   return (
@@ -34,7 +32,7 @@ const EmptyChatPrompt = ({ advancedMode, onSuggestionClick }: { advancedMode?: b
       </div>
       <h3 className="text-xl font-medium text-gray-900 mb-2">What can I help with?</h3>
       <p className="text-gray-600 max-w-md mb-5 text-sm">
-        I'm here to help with your college admissions journey. Ask about colleges, applications, essays, or get personalized guidance.
+        I&apos;m here to help with your college admissions journey. Ask about colleges, applications, essays, or get personalized guidance.
       </p>
       
       {onSuggestionClick && (
@@ -105,73 +103,6 @@ const StreamingMessage = ({ streamingText }: { streamingText: string }) => (
   </div>
 );
 
-const WelcomeCard = ({ onCreateChat }: { onCreateChat: () => void }) => (
-  <div className="flex-1 flex items-center justify-center bg-gray-50 p-2 md:p-4">
-    <Card className="max-w-3xl w-full">
-      <CardHeader className="text-center p-4 md:p-6">
-        <div className="mx-auto w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mb-3">
-          <GraduationCapIcon className="w-7 h-7 text-green-600" />
-        </div>
-        <CardTitle className="text-xl md:text-2xl text-green-800">Welcome to 7Edu College Counselor</CardTitle>
-        <CardDescription className="text-base text-gray-600 mt-2">
-          Your personal AI assistant for college admissions
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-4 md:p-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
-              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
-                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Personalized College Lists
-              </h3>
-              <p className="text-gray-600 text-xs">
-                Get customized recommendations based on your profile, interests, and preferences.
-              </p>
-            </div>
-            
-            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
-              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
-                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Essay Guidance
-              </h3>
-              <p className="text-gray-600 text-xs">
-                Brainstorm essay topics and receive feedback to strengthen your applications.
-              </p>
-            </div>
-            
-            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
-              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
-                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Application Strategy
-              </h3>
-              <p className="text-gray-600 text-xs">
-                Develop a strategic timeline to maximize your admission chances.
-              </p>
-            </div>
-            
-            <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
-              <h3 className="font-medium text-green-700 mb-1 flex items-center text-sm">
-                <CheckCircleIcon className="w-4 h-4 mr-2 flex-shrink-0" /> Career Exploration
-              </h3>
-              <p className="text-gray-600 text-xs">
-                Explore potential majors and career paths aligned with your interests.
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-center pt-2">
-            <Button 
-              onClick={onCreateChat}
-              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2"
-              size="lg"
-            >
-              Start a conversation
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-);
-
 const ProfileAlert = () => (
   <Alert variant="destructive" className="mt-2 bg-orange-50 text-orange-600 border-orange-200">
     <AlertTriangleIcon className="h-5 w-5" />
@@ -213,9 +144,11 @@ export default function ChatInterface() {
   
   // Create a new chat if none exists
   useEffect(() => {
-    // Don't auto-create a chat when component mounts
-    // Let the user start from the welcome card
-  }, []);
+    // Auto-create a chat when component mounts if no current chat exists
+    if (!currentChatId) {
+      createNewChat();
+    }
+  }, [currentChatId, createNewChat]);
 
   // Auto scroll to bottom when messages change or streaming text updates
   useEffect(() => {
@@ -381,7 +314,12 @@ export default function ChatInterface() {
   const currentChat = getCurrentChat();
 
   if (!currentChat) {
-    return <WelcomeCard onCreateChat={() => createNewChat()} />;
+    // Instead of showing the welcome card, show a loading indicator while the chat is being created
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-solid border-green-500 border-r-transparent"></div>
+      </div>
+    );
   }
 
   return (
