@@ -2,12 +2,12 @@ import Link from 'next/link';
 import { ReactNode } from 'react';
 
 interface HeaderProps {
-  onShareClick?: () => void;
   currentPage: 'form' | 'chat' | 'analysis' | 'profile';
   rightContent?: ReactNode;
+  onShareClick?: () => void;
 }
 
-export default function Header({ onShareClick, currentPage, rightContent }: HeaderProps) {
+export default function Header({ currentPage, rightContent }: HeaderProps) {
   // Use green background for all pages
   const getBgColor = () => {
     return 'bg-green-700 border-b border-green-800';
@@ -31,24 +31,26 @@ export default function Header({ onShareClick, currentPage, rightContent }: Head
           <Link href="/" className={`text-2xl font-display font-bold ${getLogoColor()}`}>7Edu</Link>
         </div>
         
-        {/* Navigation Links */}
-        <div className="hidden md:flex items-center space-x-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`font-medium ${
-                item.current 
-                  ? 'text-white underline underline-offset-4' 
-                  : 'text-green-100 hover:text-white hover:underline hover:underline-offset-4'
-              } transition-colors duration-200`}
-            >
-              {item.name}
-            </Link>
-          ))}
-        </div>
-        
+        {/* All Navigation Links are moved to the right */}
         <div className="flex items-center space-x-4">
+          {/* Desktop Navigation - Hidden on small screens */}
+          <div className="hidden md:flex items-center space-x-4">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`font-medium ${
+                  item.current 
+                    ? 'text-white underline underline-offset-4' 
+                    : 'text-green-100 hover:text-white hover:underline hover:underline-offset-4'
+                } transition-colors duration-200`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+          
+          {/* View Analysis button or other right content */}
           {rightContent}
           
           {/* Mobile Menu - Only shown on small screens */}
