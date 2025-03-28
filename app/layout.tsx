@@ -4,6 +4,7 @@ import "./globals.css";
 import { UserProvider } from "./lib/context/UserContext";
 import { ChatProvider } from "./lib/context/ChatContext";
 import TestModeProvider from "@/components/test/TestModeProvider";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default function RootLayout({
             <ChatProvider>
               {children}
               <TestModeProvider />
+              <Toaster position="top-right" />
             </ChatProvider>
           </UserProvider>
         </div>
